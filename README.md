@@ -7,3 +7,4 @@
 - kubectl create namespace pets
 - kubectl apply -f https://raw.githubusercontent.com/Azure-Samples/aks-store-demo/refs/heads/main/aks-store-quickstart.yaml -n pets
 - kubectl get all -n pets
+- kubectl get svc store-front -n pets
