@@ -172,3 +172,84 @@ kubeconfig file contains the following information:
 
 - Kubernetes schedules containers to run on nodes in the cluster.
 - But as it schedules containers, it must know how much CPU and memory each container is expected to use
+- Should define requests and limits for each container in your application.
+- Requests are the minimum amount of CPU and memory that the container needs to run.
+- Limits are the maximum amount of CPU and memory that the container can use
+- This allows Kubernetes to schedule the container on a node that has enough resources to run the container.
+- Making sure the application has enough resources to run is important for performance and reliability.
+- Not only that, but preventing a container from using more resources than it needs is important for cost savings.
+- `kubectl top pod`  to view the resource usage of the containers in the cluster
+- In AKS, you can use the **AKS Monitor** feature and use the built in **Workbooks** to get recommendations for the resource requests and limits for the containers in the cluster.
+- Can use the **Vertical Pod Autoscaler (VPA)** to automatically adjust the requests and limits for the containers in the cluster.
+- The **VPA** will monitor the resource usage of the containers and adjust the requests and limits over time and based on the usage patterns
+- The VPA is an operator that runs in the cluster and uses the Kubernetes API to monitor the resource usage of the containers.
+- It can be installed as a managed add-on in AKS
+- Need to create a VPA resource that specifies the target deployment and the resource requests and limits.
+- The VPA will then monitor the resource usage of the containers in the deployment and adjust the requests and limits over time
+- `kubectl get vpa`
+
+## Understand ConfigMaps
+
+- Almost every application has settings that can be configured.
+- These settings are typically stored in a configuration file or environment variables.
+- In Kubernetes, you can use ConfigMaps to store these settings and make them available to the application.
+- You can create a ConfigMap resource from a file or from literal values.
+- The ConfigMap resource can then be mounted as a volume in the Pod or used as environment variables in the containe
+
+## Create & consume Secrets
+
+- Just like ConfigMaps, you can use Secrets to store sensitive information such as passwords, tokens, and SSH keys.
+- Secrets are similar to ConfigMaps, but they are base64 encoded and are intended to be used for sensitive information.
+- Instead of creating a Secrets resource, can use the **Azure App Config Provider** for Kubernetes to store the secrets in Azure Key Vault and use them in the application
+- `kubectl create secret generic contoso-air-secrets \
+--from-literal=AZURE_COSMOS_LISTCONNECTIONSTRINGURL=$MONGO_LISTCONNECTIONSTRING_URL`
+- The Kubernetes Secret resource is created and the secret is stored in the cluster
+- With AKS, you can store secrets in Azure Key Vault and use the Secret Store CSI driver to access the secrets in your application
+
+## Understand ServiceAccounts
+
+- ServiceAccounts are used to **provide an identity for applications that run in the cluster**.
+- By default, Kubernetes creates a default ServiceAccount for each namespace.
+- This ServiceAccount can be used by the application to authenticate to the Kubernetes API server.
+- A great example of ServiceAccount usage in AKS is with the Workload Identity feature.
+- Workload Identity allows you to use Microsoft Entra ID to authenticate to Azure services from the application running in the cluster
+- With ServiceAccount it can be annotated with the **azure.workload.identity/client-id** annotation which maps to the **Client ID** of the **Microsoft Entra ID application**
+- apply this annotation to deployment `azure.workload.identity/use: "true"`
+
+## Services and Networking
+
+- Every Pod in the cluster has its own IP address and can communicate with other Pods in the cluster using their IP addresses.
+- As Pods are exposed via Services, discoverability and load balancing is enabled out-of-the-box so applications can reach each other using an internal DNS name.
+- NetworkPolicies are used to control the traffic between Pods in the cluster.
+- By default, all traffic is allowed between Pods in the same namespace.
+- You can use NetworkPolicies to restrict the traffic between Pods and control which Pods can communicate with each other.
+- By default, AKS clusters do not have NetworkPolicies enabled
+- NetworkPolicies are a powerful way to control the traffic between Pods in the cluster.
+- However, they can be complex to manage and configure
+
+## Provide and troubleshoot access to applications via services
+
+- In Kubernetes, a Service is a resource that provides a stable endpoint for accessing a set of Pods.
+- Services are used to expose applications running in the cluster to the outside world or to other applications running in the cluster.
+- For HTTP-based applications, Services might not be the best option as they are **limited to Layer 4 of the OSI model**
+- They can only route traffic based on the IP address and port of the request.
+- For HTTP-based applications, you will want to use an Ingress resource to expose the application to the outside world
+
+## Use Ingress rules to expose applications
+
+- Can use the `kubectl port-forward` command to access the applications running in the cluster
+- Can use the `kubectl expose` command to create a Service resource that e**xposed a HTTP-based application** to the outside world via public IP
+- Great for dev and testing
+- In production, you will want to use an **Ingress resource** to expose the application to the outside world
+- Ingress is a Kubernetes resource that allows you to expose your application to the outside world.
+- Ingress resources are used to define rules for routing traffic to the application at **Layer 7 of the OSI model**.
+- This means that you can route traffic based on the hostname and path of the request.
+- The Ingress-Nginx project is a popular Ingress controller for Kubernetes. It is a powerful and flexible Ingress controller that can be used to expose your application to the outside world.
+- This operator is available in AKS as a managed add-on.
+- So you can simply deploy an Ingress resource and the Ingress-Nginx controller will be deployed for you.
+- With AKS, the Ingress-Nginx controller is deployed as a managed add-on known as AKS App Routing.
+- You can simply deploy an Ingress resource and the Ingress-Nginx controller will be deployed for you.
+- The Ingress resource is considered to be a reliable yet legacy way to manage traffic in Kubernetes.
+- The Gateway API is emerging as a new standard for managing traffic in Kubernetes for both Layer 4 and Layer 7 traffic.
+- The **AKS App Routing add-on** does more than just deploy the Ingress-Nginx controller.
+- It also provides integration with Azure DNS and Azure Key Vault to provide an end-to-end solution for exposing your application to the outside world and managing the secrets and certificates for it.
