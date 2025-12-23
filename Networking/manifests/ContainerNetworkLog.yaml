@@ -1,0 +1,36 @@
+apiVersion: acn.azure.com/v1alpha1
+kind: ContainerNetworkLog
+metadata:
+  name: testcnl # Cluster scoped
+spec:
+  includefilters: # List of filters
+    - name: egress-filter # Capture egress traffic from pets namespace
+      from:
+        namespacedPod: # List of source namespace/pods. Prepend namespace with /
+          - pets/order-service-
+          - pets/product-service-
+          - pets/rabbitmq
+          - pets/store-front-
+          - kube-system/core-dns-
+      protocol: # List of protocols; can be tcp, udp, dns
+        - tcp
+        - udp
+        - dns
+      verdict: # List of verdicts; can be forwarded, dropped
+        - forwarded
+        - dropped
+    
+    - name: ingress-filter # Capture ingress traffic to pets namespace
+      to:
+        namespacedPod: # Destination pods
+          - pets/store-front-
+          - pets/order-service-
+          - pets/product-service-
+          - pets/rabbitmq
+          - kube-system/core-dns-
+      protocol:
+        - tcp
+        - udp
+      verdict:
+        - forwarded
+        - dropped

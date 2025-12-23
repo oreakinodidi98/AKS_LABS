@@ -16,24 +16,37 @@ $env:RG_NAME = "aroresourcegroup$RAND"
 Write-Output "Resource group name: $env:RG_NAME"
 
 # set cluster name
-$env:CLUSTER_NAME = "myAROCluster$RAND"
+$env:CLUSTER_NAME = "AROCluster$RAND"
+$env:CLUSTER_VERSION = "4.15.35"
 Write-Output "Cluster name: $env:CLUSTER_NAME"
 
 # Create the resource group
 az group create --name $env:RG_NAME --location $env:LOCATION
 
 # Register the Microsoft.RedHatOpenShift resource provider
-az provider register -n Microsoft.RedHatOpenShift
+az provider register -n Microsoft.RedHatOpenShift --wait
 
 # Register the Microsoft.Compute resource provide
-az provider register -n Microsoft.Compute
+az provider register -n Microsoft.Compute --wait
+
+# Register the Microsoft.Authorization resource provide
+az provider register -n Microsoft.Authorization --wait
 
 # Register the Microsoft.Storage resource provide
-az provider register -n Microsoft.Storage
+az provider register -n Microsoft.Storage --wait
+
+Write-Output "All providers registered successfully."
+
+# pause for a few seconds to allow time for registration to complete
+Start-Sleep -Seconds 30
+
+# check AZcli
+$azVersion = az --version
+Write-Output "AZ CLI Version: $azVersion"
 
 # create Virtual network
-$env:VNET_NAME = "myVNet$RAND"
-$env:SUBNET_NAME = "mySubnet$RAND"
+$env:VNET_NAME = "aroVNet$RAND"
+$env:SUBNET_NAME = "aroSubnet$RAND"
 Write-Output "VNet name: $env:VNET_NAME"
 Write-Output "Subnet name: $env:SUBNET_NAME"
 az network vnet create --resource-group $env:RG_NAME --name $env:VNET_NAME --address-prefix 10.0.0.0/22
@@ -48,5 +61,9 @@ az network vnet subnet create --resource-group $env:RG_NAME --vnet-name $env:VNE
 az network vnet subnet update --resource-group $env:RG_NAME --vnet-name $env:VNET_NAME --name "master-subnet" --disable-private-endpoint-network-policies true
 
 Write-Output " need to Obtain your pull secret by navigating to https://cloud.redhat.com/openshift/install/azure/aro-provisioned and clicking Download pull secret. Run the following command to create a cluster. When running the az aro create command, you can reference your pull secret using the –pull-secret @pull-secret.txt parameter. Execute az aro create from the directory where you stored your pull-secret.txt file. Otherwise, replace @pull-secret.txt with @<path-to-my-pull-secret-file>."
+# instal Aro  preview extension
+az extension add --name aro --upgrade
+Write-Output "ARO extension installed successfully."
+
 # create ARO cluster
-az aro create --resource-group $env:RG_NAME --name $env:CLUSTER_NAME --vnet $env:VNET_NAME --master-subnet "master-subnet" --worker-subnet "worker-subnet" --location $env:LOCATION --pull-secret @pull-secret.txt --cluster-resource-group "${env:RG_NAME}-cluster"
+az aro create --resource-group $env:RG_NAME --name $env:CLUSTER_NAME --vnet $env:VNET_NAME --master-subnet "master-subnet" --worker-subnet "worker-subnet" --location $env:LOCATION --pull-secret @pull-secret.txt --cluster-resource-group "${env:RG_NAME}-cluster" --version 4.17.27

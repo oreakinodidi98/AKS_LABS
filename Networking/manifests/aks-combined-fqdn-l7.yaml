@@ -1,0 +1,67 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: combined-fqdn-l7-policy
+  namespace: pets
+spec:
+  endpointSelector:
+    matchLabels:
+      app: store-front
+  
+  # BLOCK ALL INGRESS TRAFFIC
+  ingress: []  # Empty ingress = block all incoming traffic
+  
+  egress:
+  # 1. Allow DNS to kube-dns (only for specific domains)
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s:k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: ANY
+      rules:
+        dns:
+          - matchPattern: "rabbitmq.pets.svc.cluster.local"
+          - matchPattern: "*.microsoft.com"
+          - matchPattern: "*.microsoft.com.cluster.local"
+          - matchPattern: "*.microsoft.com.pets.svc.cluster.local"
+          - matchPattern: "*.microsoft.com.*.*.internal.cloudapp.net"
+          - matchPattern: "*.microsoft.com.svc.cluster.local"
+          - matchPattern: "*.pets.svc.cluster.local"
+          - matchPattern: "*.svc.cluster.local"
+          # NOTE: api.github.com, google.com, and bing.com are NOT in DNS rules
+          # This will cause DNS queries to fail for these domains
+
+  # 2. Allow both HTTP and HTTPS to *.microsoft.com (FQDN filtering)
+  - toFQDNs:
+    - matchPattern: "*.microsoft.com"
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      - port: "443"
+        protocol: TCP
+
+  # 3. Allow HTTPS to api.github.com (but DNS will fail - see note above)
+  # This demonstrates a common misconfiguration: toFQDNs without DNS rules
+  - toFQDNs:
+    - matchName: api.github.com
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
+  # 4. Allow internal backend communication with L7 HTTP rules
+  - toEndpoints:
+    - matchLabels:
+        app: product-service
+    toPorts:
+    - ports:
+      - port: "3002"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET"
+          path: "/"

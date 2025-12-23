@@ -9,7 +9,7 @@ spec:
   ingress:
     - fromEndpoints:
         - matchLabels:
-            app: order-service
+            app: order-service # rabbitmq can recieve traffic from order-service on ports 5672 and 15672
       toPorts:
         - ports:
             - port: "5672"
