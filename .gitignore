@@ -1,0 +1,71 @@
+# Azure credentials and secrets
+pull-secret.txt
+*.secret
+*.key
+*.pem
+*.pfx
+
+# Azure CLI output
+*.json.bak
+
+# PowerShell session state
+*.pssc
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+~$*
+
+# Backup files
+*.bak
+*.backup
+
+# Azure Resource Manager parameter files with secrets
+*parameters.json
+azuredeploy.parameters.json
+
+# kubeconfig files
+kubeconfig
+*.kubeconfig
+config.yaml
+
+# SSH keys
+id_rsa
+id_rsa.pub
+*.ppk
+
+# Sensitive IP/resource information
+*_ip.txt
+vm_ip.txt
+worker_vm_ip.txt
+worker_vm_private_ip.txt
+worker_vm_public_ip.txt
+*_rg_name.txt
+worker_rg_name.txt
+*_vnet_name.txt
+worker_vnet_name.txt
