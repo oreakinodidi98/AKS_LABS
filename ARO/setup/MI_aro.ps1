@@ -154,7 +154,7 @@ foreach ($identity in $operatorIdentities) {
     az role assignment create `
         --assignee-object-id $clusterPrincipalId `
         --assignee-principal-type ServicePrincipal `
-        --role "Managed Identity Operator" `
+        --role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/ef318e2a-8334-4a05-9e4a-295a196c6a6e" `
         --scope "/subscriptions/$subscriptionId/resourcegroups/$env:RG_NAME/providers/Microsoft.ManagedIdentity/userAssignedIdentities/$identity"
 }
 
@@ -162,38 +162,87 @@ Write-Output "  Assigning network permissions to operators..."
 
 # Cloud Controller Manager - master and worker subnets
 $ccmPrincipalId = az identity show --resource-group $env:RG_NAME --name cloud-controller-manager --query principalId -o tsv
-az role assignment create --assignee-object-id $ccmPrincipalId --assignee-principal-type ServicePrincipal --role "Network Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/master-subnet"
-az role assignment create --assignee-object-id $ccmPrincipalId --assignee-principal-type ServicePrincipal --role "Network Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/worker-subnet"
+az role assignment create `
+--assignee-object-id $ccmPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/a1f96423-95ce-4224-ab27-4e3dc72facd4" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/master-subnet"
+az role assignment create `
+--assignee-object-id $ccmPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/a1f96423-95ce-4224-ab27-4e3dc72facd4" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/worker-subnet"
 
 # Ingress - master and worker subnets
 $ingressPrincipalId = az identity show --resource-group $env:RG_NAME --name ingress --query principalId -o tsv
-az role assignment create --assignee-object-id $ingressPrincipalId --assignee-principal-type ServicePrincipal --role "Private DNS Zone Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/master-subnet"
-az role assignment create --assignee-object-id $ingressPrincipalId --assignee-principal-type ServicePrincipal --role "Private DNS Zone Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/worker-subnet"
+az role assignment create `
+--assignee-object-id $ingressPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/0336e1d3-7a87-462b-b6db-342b63f7802c" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/master-subnet"
+az role assignment create `
+--assignee-object-id $ingressPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/0336e1d3-7a87-462b-b6db-342b63f7802c" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/worker-subnet"
 
 # Machine API - master and worker subnets
 $machineApiPrincipalId = az identity show --resource-group $env:RG_NAME --name machine-api --query principalId -o tsv
-az role assignment create --assignee-object-id $machineApiPrincipalId --assignee-principal-type ServicePrincipal --role "Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/master-subnet"
-az role assignment create --assignee-object-id $machineApiPrincipalId --assignee-principal-type ServicePrincipal --role "Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/worker-subnet"
+az role assignment create `
+--assignee-object-id $machineApiPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/0358943c-7e01-48ba-8889-02cc51d78637" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/master-subnet"
+az role assignment create `
+--assignee-object-id $machineApiPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/0358943c-7e01-48ba-8889-02cc51d78637" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/worker-subnet"
 
 # Cloud Network Config - vnet level
 $cloudNetPrincipalId = az identity show --resource-group $env:RG_NAME --name cloud-network-config --query principalId -o tsv
-az role assignment create --assignee-object-id $cloudNetPrincipalId --assignee-principal-type ServicePrincipal --role "Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME"
+az role assignment create `
+--assignee-object-id $cloudNetPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/be7a6435-15ae-4171-8f30-4a343eff9e8f" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME"
 
 # File CSI Driver - vnet level
 $fileCsiPrincipalId = az identity show --resource-group $env:RG_NAME --name file-csi-driver --query principalId -o tsv
-az role assignment create --assignee-object-id $fileCsiPrincipalId --assignee-principal-type ServicePrincipal --role "Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME"
+az role assignment create `
+--assignee-object-id $fileCsiPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/0d7aedc0-15fd-4a67-a412-efad370c947e" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME"
 
 # Image Registry - vnet level
 $imageRegPrincipalId = az identity show --resource-group $env:RG_NAME --name image-registry --query principalId -o tsv
-az role assignment create --assignee-object-id $imageRegPrincipalId --assignee-principal-type ServicePrincipal --role "Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME"
+az role assignment create `
+--assignee-object-id $imageRegPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/8b32b316-c2f5-4ddf-b05b-83dacd2d08b5" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME"
+
 # ARO Operator - master and worker subnets
 $aroOpPrincipalId = az identity show --resource-group $env:RG_NAME --name aro-operator --query principalId -o tsv
-az role assignment create --assignee-object-id $aroOpPrincipalId --assignee-principal-type ServicePrincipal --role "Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/master-subnet"
-az role assignment create --assignee-object-id $aroOpPrincipalId --assignee-principal-type ServicePrincipal --role "Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/worker-subnet"
+az role assignment create `
+--assignee-object-id $aroOpPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/4436bae4-7702-4c84-919b-c4069ff25ee2" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/master-subnet"
+az role assignment create `
+--assignee-object-id $aroOpPrincipalId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/4436bae4-7702-4c84-919b-c4069ff25ee2" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME/subnets/worker-subnet"
 
 # First-party service principal role assignment
 $aroRpSpObjectId = az ad sp list --display-name "Azure Red Hat OpenShift RP" --query '[0].id' -o tsv
-az role assignment create --assignee-object-id $aroRpSpObjectId --assignee-principal-type ServicePrincipal --role "Contributor" --scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME"
+az role assignment create `
+--assignee-object-id $aroRpSpObjectId `
+--assignee-principal-type ServicePrincipal `
+--role "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7" `
+--scope "/subscriptions/$subscriptionId/resourceGroups/$env:RG_NAME/providers/Microsoft.Network/virtualNetworks/$env:VNET_NAME"
 
 Write-Output "Role assignments completed"
 
