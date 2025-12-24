@@ -17,7 +17,7 @@ Write-Output "Resource group name: $env:RG_NAME"
 
 # set cluster name
 $env:CLUSTER_NAME = "AROCluster$RAND"
-$env:CLUSTER_VERSION = "4.15.35"
+$env:CLUSTER_VERSION = "4.19.20"
 Write-Output "Cluster name: $env:CLUSTER_NAME"
 
 # Create the resource group
@@ -62,8 +62,14 @@ az network vnet subnet update --resource-group $env:RG_NAME --vnet-name $env:VNE
 
 Write-Output " need to Obtain your pull secret by navigating to https://cloud.redhat.com/openshift/install/azure/aro-provisioned and clicking Download pull secret. Run the following command to create a cluster. When running the az aro create command, you can reference your pull secret using the –pull-secret @pull-secret.txt parameter. Execute az aro create from the directory where you stored your pull-secret.txt file. Otherwise, replace @pull-secret.txt with @<path-to-my-pull-secret-file>."
 # instal Aro  preview extension
-az extension add --name aro --upgrade
-Write-Output "ARO extension installed successfully."
+$env:extensionUrl = "https://aka.ms/az-aroext-latest"
+$env:fileName = "aro-1.0.12-py2.py3-none-any.whl"
+
+Write-Output "Downloading ARO preview extension..."
+Invoke-WebRequest -Uri $env:extensionUrl -OutFile $env:fileName -MaximumRedirection 10
+
+Write-Output "Installing ARO preview extension..."
+az extension add --source $env:fileName --yes
 
 # create ARO cluster
 az aro create --resource-group $env:RG_NAME --name $env:CLUSTER_NAME --vnet $env:VNET_NAME --master-subnet "master-subnet" --worker-subnet "worker-subnet" --location $env:LOCATION --pull-secret @pull-secret.txt --cluster-resource-group "${env:RG_NAME}-cluster" --version 4.17.27
