@@ -69,3 +69,30 @@ worker_vm_public_ip.txt
 worker_rg_name.txt
 *_vnet_name.txt
 worker_vnet_name.txt
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+#ignote terraform lock file 
+.terraform.lock.hcl
+# ignote terraform tfplan files
+*.tfplan
+#ignore kubeconfig files
+*.kubeconfig
+# ignoter kube certificate files
+*.pem
+#ignore tfstate backup files
+*.tfstate.backup
+# ignore client secret files
+*.client_secret
+#ignore client certificate files
+*.client_certificate
+#ignore kubernetes.crt files
+*.crt
+/modules/aks/azurek8s.config
+
+.infracost/*
+**/.infracost/*
+**/k8s-Copy/*
+*.ps1
