@@ -276,3 +276,18 @@ az aro create `
 Write-Output ""
 Write-Output "ARO cluster creation initiated!"
 Write-Output "This will take 30-45 minutes to complete."
+
+# Get credentials
+CREDS=$(az aro list-credentials --name $CLUSTER_NAME --resource-group $RESOURCE_GROUP)
+USERNAME=$(echo $CREDS | jq -r '.kubeadminUsername')
+PASSWORD=$(echo $CREDS | jq -r '.kubeadminPassword')
+
+# Get API server URL
+API_SERVER=$(az aro show --name $CLUSTER_NAME --resource-group $RESOURCE_GROUP --query apiserverProfile.url -o tsv)
+
+# Login to cluster
+oc login $API_SERVER -u $USERNAME -p $PASSWORD
+
+# Verify connection
+oc whoami
+oc get nodes
