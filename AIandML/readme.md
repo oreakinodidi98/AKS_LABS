@@ -15,6 +15,10 @@
   - [Ray Cluster](#ray-cluster)
     - [What is Ray?](#what-is-ray)
     - [Ray Libraries](#ray-libraries)
+      - [Ray Train Architecture](#ray-train-architecture)
+        - [Single-Machine Training (Before):](#single-machine-training-before)
+        - [Distributed Training with Ray Train (After):](#distributed-training-with-ray-train-after)
+        - [Key Benefits:](#key-benefits)
     - [What is KubeRay?](#what-is-kuberay)
   - [Deployment Process](#deployment-process)
   - [Deploying a Ray Job](#deploying-a-ray-job)
@@ -23,6 +27,7 @@
     - [Monitoring the Job](#monitoring-the-job)
   - [Ray Dashboard](#ray-dashboard)
   - [BlobFuse](#blobfuse)
+  - [Ray Cluster Configuration](#ray-cluster-configuration)
 
 ---
 
@@ -98,10 +103,32 @@ Ray is a free, open-source framework (originally from UC Berkeley) that lets you
 | Library | Purpose |
 |---|---|
 | **Ray Core** | Distributed computing primitives |
-| **Ray Train** | Distributed ML model training |
+| **Ray Train** | Distributed ML model training: Ray Train enables us to distribute training across multiple machines with minimal code changes, dramatically reducing training time and enabling larger models/datasets. |
 | **Ray Serve** | Scalable model serving |
 | **Ray Tune** | Hyperparameter tuning at scale |
 | **Ray Data** | Distributed data processing |
+
+#### Ray Train Architecture
+
+ Ray Train allows you to distribute training across multiple machines with minimal code changes, dramatically reducing training time and enabling larger models/datasets.
+
+##### Single-Machine Training (Before):
+
+[Data] → [Single GPU/CPU] → [Model] → [Save Model]
+         (Limited resources)
+
+##### Distributed Training with Ray Train (After):
+
+[Data] → [Ray Train Coordinator] → [Worker 1: GPU/CPU] → [Gradient Sync] → [Updated Model]
+                                 → [Worker 2: GPU/CPU] → [Gradient Sync] ↗
+                                 → [Worker N: GPU/CPU] → [Gradient Sync] ↗
+
+##### Key Benefits:
+
+- **Faster Training**: Parallel processing across multiple workers
+- **Scalability**: Add more workers as needed
+- **Automatic Coordination**: Ray handles data distribution and gradient synchronization
+- **Resource Efficiency**: Better utilization of cluster resources
 
 ### What is KubeRay?
 
@@ -174,6 +201,13 @@ The Ray head service runs on port **8265** by default. To expose it via the AKS 
 
 - A service shim is a lightweight Kubernetes `Service` that listens on port **80** and forwards traffic to port **8265** on the Ray head pod
 - An `Ingress` resource then routes public HTTP traffic to the shim
+- The Ray dashboard shows:
+  - Cluster Overview: Head and worker nodes status and resource allocation
+  - Resource Utilization: Real-time CPU, memory, and network usage across nodes
+  - Running Jobs: Active and completed jobs with execution details
+  - Actor and Task Details: Task queues, execution times, and failures
+  - Log Streaming: Real-time logs from Ray head and worker nodes
+  - Performance Metrics: Throughput, latency, and error rates
 
 ```bash
 # Create the service shim
@@ -195,3 +229,12 @@ Access the dashboard at: `http://<public-ip>/`
 - This results in more efficient resource utilization and accelerates the overall tuning process
 - This solution leverages KubeRay to orchestrate Ray clusters on AKS, with BlobFuse providing scalable and performant storage.
 - This architecture ensures high throughput for distributed tuning jobs, allowing multiple Ray workers to efficiently read and write data in parallel, which accelerates model training and hyperparameter optimization
+
+## Ray Cluster Configuration
+
+- The basic Ray cluster configuration includes a head node for coordination and worker nodes for computation.
+- Key features of the CPU configuration:
+- Ray head node with dashboard and API access
+- Scalable worker group (1-5 replicas)
+- Resource limits and requests for production stability
+- Volume mounts for Ray logs and temporary files
