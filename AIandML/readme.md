@@ -2,24 +2,27 @@
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [The Challenge](#the-challenge)
-3. [Why AKS for AI and ML?](#why-aks-for-ai-and-ml)
-4. [Architecture Summary](#architecture-summary)
-   - [AKS — The Foundation](#aks--the-foundation)
-   - [Ray — The Engine](#ray--the-engine)
-   - [KubeRay — The Translator](#kuberay--the-translator)
-   - [Ray Job Spec — The Recipe](#ray-job-spec--the-recipe)
-5. [Ray Cluster](#ray-cluster)
-   - [What is Ray?](#what-is-ray)
-   - [Ray Libraries](#ray-libraries)
-   - [What is KubeRay?](#what-is-kuberay)
-6. [Deployment Process](#deployment-process)
-7. [Deploying a Ray Job](#deploying-a-ray-job)
-   - [Ray Job Spec Fields](#ray-job-spec-fields)
-   - [Resource Requirements](#resource-requirements)
-   - [Monitoring the Job](#monitoring-the-job)
-8. [Ray Dashboard](#ray-dashboard)
+- [AI and ML Workloads in Azure Kubernetes Service](#ai-and-ml-workloads-in-azure-kubernetes-service)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [The Challenge](#the-challenge)
+  - [Why AKS for AI and ML?](#why-aks-for-ai-and-ml)
+  - [Architecture Summary](#architecture-summary)
+    - [AKS — The Foundation](#aks--the-foundation)
+    - [Ray — The Engine](#ray--the-engine)
+    - [KubeRay — The Translator](#kuberay--the-translator)
+    - [Ray Job Spec — The Recipe](#ray-job-spec--the-recipe)
+  - [Ray Cluster](#ray-cluster)
+    - [What is Ray?](#what-is-ray)
+    - [Ray Libraries](#ray-libraries)
+    - [What is KubeRay?](#what-is-kuberay)
+  - [Deployment Process](#deployment-process)
+  - [Deploying a Ray Job](#deploying-a-ray-job)
+    - [Ray Job Spec Fields](#ray-job-spec-fields)
+    - [Resource Requirements](#resource-requirements)
+    - [Monitoring the Job](#monitoring-the-job)
+  - [Ray Dashboard](#ray-dashboard)
+  - [BlobFuse](#blobfuse)
 
 ---
 
@@ -88,7 +91,7 @@ A simple YAML file that defines exactly what the job should do:
 
 ### What is Ray?
 
-Ray is a free, open-source framework (originally from UC Berkeley) that lets you take a Python program and distribute it across many machines with minimal code changes.
+Ray is a free, open-source framework (originally from UC Berkeley) that lets you take a Python program and distribute it across many machines with minimal code changes. Essentially an open-source framework for distributed computing and machine learning workloads.
 
 ### Ray Libraries
 
@@ -181,3 +184,14 @@ kubectl get svc nginx -n app-routing-system -o jsonpath='{.status.loadBalancer.i
 ```
 
 Access the dashboard at: `http://<public-ip>/`
+
+## BlobFuse
+
+- Can also configure and deploy a Ray cluster on Azure Kubernetes Service (AKS) using KubeRay, with BlobFuse providing scalable storage
+- When deployed on Azure Kubernetes Service (AKS), Ray enables scalable tuning, training, and inference across multiple nodes.
+- Integrating BlobFuse as a persistent storage backend allows Ray jobs to efficiently read and write large datasets, which is critical for tuning workloads that require rapid access to training data, intermediate results, and model checkpoints.
+- High throughput from BlobFuse is essential for tuning jobs because these workloads often involve many parallel tasks, each reading and writing data simultaneously
+- BlobFuse provides POSIX-compliant, high-performance access to Azure Blob Storage, minimizing I/O bottlenecks and ensuring that distributed Ray tasks can complete faster.
+- This results in more efficient resource utilization and accelerates the overall tuning process
+- This solution leverages KubeRay to orchestrate Ray clusters on AKS, with BlobFuse providing scalable and performant storage.
+- This architecture ensures high throughput for distributed tuning jobs, allowing multiple Ray workers to efficiently read and write data in parallel, which accelerates model training and hyperparameter optimization
