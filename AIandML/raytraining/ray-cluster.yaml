@@ -5,7 +5,7 @@ metadata:
   labels:
     controller-tools.k8s.io: "1.0"
   name: raycluster-ml
-  namespace: ray-system
+  namespace: kuberay
 spec:
   rayVersion: '2.8.0'
   # Ray head pod template
