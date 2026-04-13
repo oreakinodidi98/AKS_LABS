@@ -25,11 +25,21 @@
     - [Resource Requirements](#resource-requirements)
     - [Monitoring the Job](#monitoring-the-job)
   - [Ray Dashboard](#ray-dashboard)
+  - [Integrate with Azure Monitor](#integrate-with-azure-monitor)
   - [BlobFuse Storage Integration](#blobfuse-storage-integration)
   - [Ray Cluster Configuration](#ray-cluster-configuration)
   - [Auto-scaling and Resource Management](#auto-scaling-and-resource-management)
     - [Horizontal Pod Autoscaler](#horizontal-pod-autoscaler)
     - [Cluster Autoscaler](#cluster-autoscaler)
+  - [Ray Data: Distributed Data Processing](#ray-data-distributed-data-processing)
+    - [Ray Data Architecture](#ray-data-architecture)
+      - [Why Ray Data is valuable](#why-ray-data-is-valuable)
+    - [Demo Data Processing Pipeline + Job](#demo-data-processing-pipeline--job)
+  - [Best Practices](#best-practices)
+    - [Resource Optimisation](#resource-optimisation)
+    - [Performance Tuning](#performance-tuning)
+    - [Security](#security)
+  - [Key Takeaways](#key-takeaways)
 
 ---
 
@@ -321,7 +331,7 @@ kubectl logs -n kuberay <pod-name>
 
 ## Ray Dashboard
 
-The Ray Dashboard is a web UI for real-time monitoring of Ray clusters — useful when training jobs run for hours or days.
+The Ray Dashboard is a web UI for real-time monitoring of Ray clusters — useful when training jobs run for hours or days. The Ray dashboard provides real-time insights into cluster performance.
 
 The Ray head service runs on port **8265** by default. To expose it via the AKS ingress controller (port 80), a **service shim** is created: a lightweight `Service` that listens on port 80 and forwards traffic to port 8265 on the Ray head pod. An `Ingress` resource then routes public HTTP traffic to the shim.
 
@@ -352,6 +362,35 @@ kubectl get svc nginx -n app-routing-system \
 
 Access the dashboard at `http://<public-ip>/`.
 
+## Integrate with Azure Monitor
+
+Set up monitoring with Prometheus for metrics collection and Grafana for visualisation, specifically configured for Ray workloads.
+
+| Component | Description |
+|---|---|
+| **Prometheus Configuration** | Automatically discovers Ray head and worker services |
+| **Grafana Dashboard** | Pre-configured with Ray-specific visualisations |
+| **Service Discovery** | Kubernetes-native service discovery for dynamic scaling |
+| **Alert Rules** | Built-in alerting for common Ray issues |
+
+Apply the monitoring configuration:
+
+```bash
+kubectl apply -f ray-monitoring.yaml
+```
+
+Access the dashboards:
+
+```bash
+# Prometheus
+kubectl port-forward -n $RAY_NAMESPACE deployment/ray-prometheus 9090:9090
+# → http://localhost:9090
+
+# Grafana
+kubectl port-forward -n $RAY_NAMESPACE service/ray-grafana-svc 3000:3000
+# → http://localhost:3000
+```
+
 ---
 
 ## BlobFuse Storage Integration
@@ -371,12 +410,12 @@ BlobFuse can be used as a persistent storage backend for Ray clusters on AKS, pr
 
 The base Ray cluster (`ray-cluster.yaml`) includes a head node for coordination and worker nodes for computation.
 
-**Key configuration features:**
-
-- Ray head node with dashboard (port 8265) and client API (port 10001) access
-- Scalable worker group with 1–5 replicas
-- Resource requests and limits for production stability
-- `emptyDir` volume mounts for Ray logs and temporary files
+| Feature | Detail |
+|---|---|
+| **Head node** | Dashboard (port 8265) and client API (port 10001) access |
+| **Worker group** | Scalable with 1–5 replicas |
+| **Resources** | Requests and limits configured for production stability |
+| **Volumes** | `emptyDir` mounts for Ray logs and temporary files |
 
 ---
 
@@ -430,3 +469,114 @@ Cluster Autoscaler adds or removes AKS nodes based on pending pod demand.
    ```bash
    kubectl get pods -n kube-system | grep cluster-autoscaler
    ```
+
+## Ray Data: Distributed Data Processing
+
+Can be used to process a large synthetic dataset across multiple nodes, demonstrating how Ray can handle ETL workloads that exceed single node memory capacity
+
+| | Traditional Approach | Ray Data |
+|---|---|---|
+| **Processing** | Single-node, limited by memory | Automatic distribution across cluster nodes |
+| **Data Partitioning** | Manual partitioning and distribution | Built-in fault tolerance and retry mechanisms |
+| **Scaling** | Complex coordination between nodes | Seamless scaling from single-node to multi-node |
+| **API** | Difficult resource management | Unified API for various data sources and formats |
+
+### Ray Data Architecture
+
+Ray Data provides a distributed data processing framework that automatically:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Ray Data Pipeline                        │
+│                                                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐      │
+│  │   Data      │    │ Transform   │    │   Output    │      │
+│  │  Creation   │──▶│ Operations  │──▶ │  Results    │      │
+│  │             │    │             │    │             │      │
+│  └─────────────┘    └─────────────┘    └─────────────┘      │
+│                                                             │
+│  Distributed across Ray cluster nodes                       │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐    │
+│  │  Node 1   │ │  Node 2   │ │  Node 3   │ │  Node 4   │    │
+│  │ Worker    │ │ Worker    │ │ Worker    │ │ Worker    │    │
+│  └───────────┘ └───────────┘ └───────────┘ └───────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Why Ray Data is valuable
+
+| Feature | Description |
+|---|---|
+| **Automatic Parallelisation** | No manual data partitioning required |
+| **Memory Efficiency** | Streams data without loading everything into memory |
+| **Fault Tolerance** | Automatic retry and recovery from node failures |
+| **Flexible Transformations** | Rich set of operations for filtering, grouping, and aggregation |
+
+### Demo Data Processing Pipeline + Job
+
+The Python file demonstrates real-world ETL operations like data generation, filtering, aggregation, and transformation.
+
+The Kubernetes Job configuration runs the data processing pipeline within the cluster, connecting to the Ray cluster for distributed execution. This shows it is possible to integrate Ray workloads with Kubernetes job management.
+
+**When deployed:**
+
+- Kubernetes creates a job pod with the processing script
+- The job connects to your existing Ray cluster
+- Ray Data automatically distributes work across available nodes
+- Processing results are collected and displayed
+
+1. Create a ConfigMap with the processing script:
+   ```bash
+   kubectl create configmap ray-data-processing-script \
+     --from-file=data_processing.py -n kuberay
+   ```
+
+2. Apply the processing job:
+   ```bash
+   kubectl apply -f data-processing-job.yaml
+   ```
+
+3. Monitor the job progress:
+   ```bash
+   kubectl logs -n $RAY_NAMESPACE job/ray-data-processing -f
+   ```
+
+---
+
+## Best Practices
+
+### Resource Optimisation
+
+| Practice | Why it matters |
+|---|---|
+| **Right-size containers** | Match CPU/memory requests and limits to actual usage — avoid over-provisioning |
+| **Use node affinity** | Pin the Ray head pod to a dedicated node so it isn't competing for resources |
+| **Separate workload pools** | Use different node pools for compute-heavy vs. memory-heavy jobs |
+
+### Performance Tuning
+
+| Practice | Why it matters |
+|---|---|
+| **Tune batch sizes** | Larger batches improve throughput but increase latency — find the right balance |
+| **Balance task granularity** | Too many tiny tasks add scheduling overhead; too few waste parallelism |
+| **Monitor the object store** | Ray's Plasma store holds shared data — watch its usage to avoid spills to disk |
+
+### Security
+
+| Practice | Why it matters |
+|---|---|
+| **Network policies** | Restrict pod-to-pod traffic so only Ray components can communicate |
+| **RBAC** | Grant least-privilege access to namespaces and cluster resources |
+| **Kubernetes Secrets** | Store credentials and tokens as Secrets — never hard-code them in manifests |
+
+---
+
+## Key Takeaways
+
+| Takeaway | Detail |
+|---|---|
+| **Minimal code changes** | Ray turns single-machine Python into distributed applications with a few annotations |
+| **Seamless K8s integration** | KubeRay manages Ray clusters declaratively — deploy, scale, and upgrade via YAML |
+| **Auto-scaling at two levels** | Combine Ray's built-in scaling with Kubernetes HPA and Cluster Autoscaler |
+| **Production-ready** | Built-in monitoring, fault tolerance, and resource management out of the box |
+| **Works with your stack** | Integrates with PyTorch, TensorFlow, Azure Monitor, BlobFuse, and more |
