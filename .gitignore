@@ -49,6 +49,9 @@ desktop.ini
 *parameters.json
 azuredeploy.parameters.json
 
+# Kubernetes config
+AIandML/iac/modules/aks/azurek8s.config
+
 # kubeconfig files
 kubeconfig
 *.kubeconfig
