@@ -99,3 +99,4 @@ terraform.rc
 **/.infracost/*
 **/k8s-Copy/*
 *.ps1
+*.config
