@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-demo-app
+spec:
+  replicas: 2 # You can adjust the number of replicas
+  selector:
+    matchLabels:
+      app: argocd-demo-app
+  template:
+    metadata:
+      labels:
+        app: argocd-demo-app
+    spec:
+      containers:
+      - name: argocd-demo-app
+        image: liquidreply/argocd-example-app:1
+        ports:
+        - containerPort: 3000 # Assuming your app runs on port 3000
