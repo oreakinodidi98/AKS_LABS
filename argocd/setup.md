@@ -16,3 +16,17 @@
 
 - download and install `wget https://github.com/argoproj/argo-cd/releases/download/v3.1.8/argocd-linux-amd64-Oargocd`
 - `argocd login localhost:8080 --username admin --password <TheAdminPasswordfrombefore> `
+
+## Deploy application to ArgoCD
+
+- create application in Argo CD
+- Application name
+- Project name
+- Auto-create namespace
+- Source: reposotory URL
+- path: direcory path where YAML is located
+- destination section , cluster-url: `https://kubernetes.default.svc/`
+- define namespace
+- create
+- forwward port of the service : `kubectl port-forward svc/argocd-demo-app-service 9090:3000 --address 0.0.0.0`
+- access on `http://localhost:9090/` or `curl localhost:9090`
