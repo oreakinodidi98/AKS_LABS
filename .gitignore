@@ -100,3 +100,4 @@ terraform.rc
 **/k8s-Copy/*
 *.ps1
 *.config
+AKS_agent/VBD_Agentic_AKS_Operations.md
