@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-custom-models
+data:
+  code-assistant.modelfile: |
+    FROM codellama:13b
+    PARAMETER temperature 0.2
+    PARAMETER num_predict 2048
+    PARAMETER top_p 0.9
+
+    SYSTEM """You are a helpful coding assistant. You write clean,
+    well-documented code. Always explain your reasoning. When you
+    suggest code changes, show the complete file with changes applied."""
+
+  support-agent.modelfile: |
+    FROM llama3.1:8b
+    PARAMETER temperature 0.7
+    PARAMETER num_predict 1024
+
+    SYSTEM """You are a customer support agent for a software company.
+    Be helpful, concise, and professional. If you do not know the answer,
+    say so honestly and suggest where the user can find help."""

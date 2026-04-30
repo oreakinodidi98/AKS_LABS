@@ -1,0 +1,34 @@
+# Monitor Ollama health and usage
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ollama-health-check
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: check
+              image: curlimages/curl:8.5.0
+              command:
+                - sh
+                - -c
+                - |
+                  # Check Ollama health
+                  status=$(curl -s -o /dev/null -w "%{http_code}" \
+                    http://ollama.default.svc:11434/)
+                  if [ "$status" != "200" ]; then
+                    echo "Ollama unhealthy: HTTP $status"
+                    # Send alert
+                    curl -X POST "$SLACK_WEBHOOK" \
+                      -H "Content-Type: application/json" \
+                      -d '{"text":"Ollama health check failed"}'
+                    exit 1
+                  fi
+
+                  # List loaded models
+                  models=$(curl -s http://ollama.default.svc:11434/api/tags)
+                  echo "Available models: $models"

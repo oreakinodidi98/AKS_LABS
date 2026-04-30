@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ollama-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # Enable streaming for chat responses
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # Basic auth for access control
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: ollama-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Ollama LLM API"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ollama.internal.example.com
+      secretName: ollama-tls
+  rules:
+    - host: ollama.internal.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ollama
+                port:
+                  number: 11434

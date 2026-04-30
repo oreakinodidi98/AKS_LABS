@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-models
+  labels:
+    app: ollama
+data:
+  models.txt: |
+    llama3.1:8b
+    mistral:7b
+    codellama:13b
+    nomic-embed-text:latest
+  pull-script.sh: |
+    #!/bin/sh
+    # Start Ollama server in the background
+    ollama serve &
+    sleep 5
+
+    # Pull each model from the list
+    while IFS= read -r model; do
+      # Skip empty lines and comments
+      [ -z "$model" ] && continue
+      echo "$model" | grep -q '^#' && continue
+
+      echo "Pulling model: $model"
+      ollama pull "$model"
+      if [ $? -ne 0 ]; then
+        echo "WARNING: Failed to pull $model"
+      fi
+    done < /config/models.txt
+
+    echo "Model preloading complete"
+    kill %1
