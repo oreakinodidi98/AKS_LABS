@@ -17,6 +17,9 @@ Open-source workflow orchestrator built on Kubernetes.
     - [Argo CLI Usage](#argo-cli-usage)
     - [DAG Workflow Execution Order](#dag-workflow-execution-order)
   - [CI/CD](#cicd)
+    - [Deploy the CI/CD Workflow](#deploy-the-cicd-workflow)
+    - [Inspect the CI/CD Workflow](#inspect-the-cicd-workflow)
+    - [Benefits of Argo Workflows for CI/CD](#benefits-of-argo-workflows-for-cicd)
 
 ## Installation
 
@@ -123,3 +126,26 @@ As we can see, in this workflow, step A runs first since it has no dependencies.
 - **Build**: The build step builds the image with the latest changes, using a Python 3 image for this scenario.
 - **Tests**: The test step mounts a volume with test files and runs unit tests with the Python unittest library.
 - **Deployment**: The deploy step runs the Python container and prints deploy. Normally, this step would involve pushing the tested code to a container registry (like AWS ECR or Harbor) and then deploying it to the production environment.
+
+### Deploy the CI/CD Workflow
+
+```bash
+kubectl -n argo apply -f argoworkflows/workflow-ci.yaml
+```
+
+### Inspect the CI/CD Workflow
+
+```bash
+argo -n argo list
+argo -n argo logs python-app
+argo -n argo get python-app
+kubectl get pods -n argo
+```
+
+### Benefits of Argo Workflows for CI/CD
+
+- **Automation and efficiency**: Argo Workflows automates the CI/CD pipeline, reducing manual intervention and enhancing efficiency.
+- **Consistency and reproducibility**: CI/CD processes are defined declaratively, ensuring consistency across multiple runs and environments.
+- **Scalability**: Argo Workflows provides scalability, allowing CI/CD processes to scale with the growing needs of the application.
+- **Visibility and monitoring**: The UI and CLI provide visibility into workflow execution, allowing teams to monitor progress and troubleshoot issues.
+- **Flexibility and customization**: Argo Workflows offers flexibility in defining custom workflows, allowing teams to tailor CI/CD pipelines to their specific requirements.

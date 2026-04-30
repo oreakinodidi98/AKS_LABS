@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: python-app
+spec:
+  entrypoint: python-app
+  templates:
+  - name: python-app
+    steps:
+    - - name: build
+        template: build
+    - - name: test
+        template: test
+    - - name: deploy
+        template: deploy
+  - name: build
+    container:
+      image: python:3.11
+      command: [python]
+      args: ["-c", "print('build')"]
+  - name: test
+    script:
+      image: python:3.11
+      command: [python]
+      source: |
+        import unittest
+
+        class TestSample(unittest.TestCase):
+            def test_placeholder(self):
+                self.assertTrue(True)
+
+        if __name__ == "__main__":
+            unittest.main()
+  - name: deploy
+    container:
+      image: python:3.11
+      command: [python]
+      args: ["-c", "print('deploy')"]
