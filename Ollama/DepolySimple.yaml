@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ollama
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: ollama
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - containerPort: 11434
+              name: http
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:11434"
+            # Keep models loaded in memory longer
+            - name: OLLAMA_KEEP_ALIVE
+              value: "24h"
+            # Set number of parallel requests
+            - name: OLLAMA_NUM_PARALLEL
+              value: "1"
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 12Gi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: ollama-data
+              mountPath: /root/.ollama
+        - name: load-models
+        # Alpine image with curl pre installed on it
+          image: curlimages/curl:latest
+          command: ["/bin/sh", "-c"]
+          # telling container to sleep infinitaley 
+          args:
+            - "sleep infinity"
+            # can also use the bellow and remove lifecycle 
+            # "curl -X POST http://localhost:11434/api/pull -H 'Content-Type: application/json' -d '{\"name\": \"llama3.1:8b\"}' && sleep infinity"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: 128Mi
+            limits:
+              cpu: "200m"
+              memory: 256Mi
+            # using lifectly podstart parameter to execute a command on continer when pod first starts up
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - "/bin/sh"
+                  - "-c"
+                  - "curl -X POST http://localhost:11434/api/pull -H 'Content-Type: application/json' -d '{\"name\": \"llama3.1:8b\"}'"
+
+                  # - "curl -X POST http://localhost:11434/api/pull -H 'Content-Type: application/json' -d '{\"name\": \"llama3.1:8b\"}' && \
+                  #    curl -X POST http://localhost:11434/api/pull -H 'Content-Type: application/json' -d '{\"name\": \"mistral:7b\"}' && \
+                  #    curl -X POST http://localhost:11434/api/pull -H 'Content-Type: application/json' -d '{\"name\": \"codellama:13b\"}' && \
+                  #    curl -X POST http://localhost:11434/api/pull -H 'Content-Type: application/json' -d '{\"name\": \"nomic-embed-text\"}'"
+      volumes:
+        - name: ollama-data
+          persistentVolumeClaim:
+            claimName: ollama-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: ollama
+  name: ollama-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: managed-csi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434

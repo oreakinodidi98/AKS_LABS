@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hf-token
+data:
+  HF_TOKEN: <BASE64_ENCODED_TOKEN_HERE>  # Replace with: echo -n "hf_yourtoken" | base64
+type: Opaque
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpt-oss-120b-inference-config
+data:
+  inference_config.yaml: |
+    vllm:
+      gpu-memory-utilization: 0.92  # Controls GPU memory usage (0.0-1.0) Default is 0.95
+---
+apiVersion: kaito.sh/v1beta1
+kind: Workspace
+metadata:
+  name: workspace-gpt-oss-120b
+resource:
+  instanceType: Standard_NC24ads_A100_v4
+  labelSelector:
+    matchLabels:
+      accelerator: nvidia
+inference:
+  preset:
+    name: gpt-oss-120b
+    presetOptions:
+      modelAccessSecret: hf-token # Reference to Secret name
+  config: gpt-oss-120b-inference-config # Reference to ConfigMap name

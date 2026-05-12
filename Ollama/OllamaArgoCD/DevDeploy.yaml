@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-ollama
+  labels:
+    app: dev-ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-ollama
+  template:
+    metadata:
+      labels:
+        app: dev-ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:0.1.27
+          ports:
+            - containerPort: 11434
+              name: http
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:11434"
+            # Keep models loaded in memory longer
+            - name: OLLAMA_KEEP_ALIVE
+              value: "24h"
+            # Set number of parallel requests
+            - name: OLLAMA_NUM_PARALLEL
+              value: "4"
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: dev-ollama-data
+              mountPath: /root/.ollama
+      volumes:
+        - name: dev-ollama-data
+          persistentVolumeClaim:
+            claimName: dev-ollama-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dev-ollama-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: managed-csi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-ollama
+spec:
+  selector:
+    app: dev-ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434

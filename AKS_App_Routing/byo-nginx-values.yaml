@@ -1,0 +1,33 @@
+##############################################################################
+# BYO Nginx Ingress Controller - Helm Values Override
+# Used to install the self-managed Nginx Ingress Controller via Helm
+# This simulates the "before" state that we migrate away from.
+##############################################################################
+
+# Install BYO Nginx Ingress Controller using Helm:
+#
+#   helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+#   helm repo update
+#   helm install ingress-nginx ingress-nginx/ingress-nginx `
+#     --namespace ingress-nginx `
+#     --create-namespace `
+#     -f byo-nginx-values.yaml
+#
+
+controller:
+  replicaCount: 2
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /healthz
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: false

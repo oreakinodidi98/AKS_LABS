@@ -1,0 +1,30 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: kaito-business-hours-scaler
+  namespace: default
+spec:
+  # Target KAITO InferenceSet to scale
+  scaleTargetRef:
+    apiVersion: kaito.sh/v1alpha1
+    kind: InferenceSet
+    name: phi-4-mini
+  # Scaling boundaries
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  # Cron-based triggers for time-based scaling
+  triggers:
+  # Scale up to 5 replicas at 6:00 AM (start of business hours)
+  - type: cron
+    metadata:
+      timezone: "America/New_York"  # Adjust timezone as needed
+      start: "0 6 * * 1-5"          # 6:00 AM Monday to Friday
+      end: "0 20 * * 1-5"           # 8:00 PM Monday to Friday
+      desiredReplicas: "5"          # Scale to 5 replicas during business hours
+  # Scale down to 1 replica at 8:00 PM (end of business hours)
+  - type: cron
+    metadata:
+      timezone: "America/New_York"  # Adjust timezone as needed
+      start: "0 20 * * 1-5"         # 8:00 PM Monday to Friday
+      end: "0 6 * * 1-5"            # 6:00 AM Monday to Friday (next day)
+      desiredReplicas: "1"          # Scale to 1 replica during off-hours

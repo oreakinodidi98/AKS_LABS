@@ -1,0 +1,22 @@
+apiVersion: kaito.sh/v1beta1
+kind: Workspace
+metadata:
+  name: workspace-tuning-phi-4-mini-instruct
+resource:
+  instanceType: Standard_NC4as_T4_v3
+  labelSelector:
+    matchLabels:
+      apps: phi-4-mini-instruct
+inference:
+  preset:
+    name: phi-4-mini-instruct
+tuning:
+  preset:
+    name: phi-4-mini-128k-instruct
+  method: qlora
+  input:
+    urls:
+      - https://huggingface.co/datasets/myuser/mydataset/resolve/main/data/train-00000-of-00001.parquet?download=true
+  output:
+    image: myregistry.azurecr.io/adapters/myadapter:0.0.1
+    imagePushSecret: myregistrysecret

@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-ollama
+  labels:
+    app: gpu-ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gpu-ollama
+  template:
+    metadata:
+      labels:
+        app: gpu-ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:0.1.27
+          ports:
+            - containerPort: 11434
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:11434"
+            - name: OLLAMA_KEEP_ALIVE
+              value: "24h"
+            - name: OLLAMA_NUM_PARALLEL
+              value: "4"
+            # GPU configuration
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+          resources:
+            requests:
+              cpu: "2"
+              memory: 12Gi
+              nvidia.com/gpu: 1
+            limits:
+              cpu: "4"
+              memory: 24Gi
+              nvidia.com/gpu: 1
+          # resources:
+          #   requests:
+          #     cpu: "4"
+          #     memory: 16Gi
+          #     nvidia.com/gpu: 1
+          #   limits:
+          #     cpu: "8"
+          #     memory: 32Gi
+          #     nvidia.com/gpu: 1
+          volumeMounts:
+            - name: gpu-ollama-data
+              mountPath: /root/.ollama
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-T4
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: gpu-ollama-data
+          persistentVolumeClaim:
+            claimName: gpu-ollama-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gpu-ollama-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: managed-csi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpu-ollama
+spec:
+  selector:
+    app: gpu-ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434

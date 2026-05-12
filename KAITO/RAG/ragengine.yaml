@@ -1,0 +1,16 @@
+apiVersion: kaito.sh/v1alpha1
+kind: RAGEngine
+metadata:
+  name: ragdemo
+spec:
+  compute:
+    instanceType: Standard_D8s_v6
+    labelSelector:
+      matchLabels:
+        apps: ragdemo
+  embedding:
+    local:
+      modelID: BAAI/bge-small-en-v1.5
+  inferenceService:
+    url: "http://workspace-phi-4-mini-instruct/v1/completions"
+    contextWindowSize: 8192
