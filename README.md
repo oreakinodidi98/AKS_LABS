@@ -10,24 +10,28 @@ Hands-on labs, deployment scripts, and reference material for Azure Kubernetes S
   - [Table of Contents](#table-of-contents)
   - [Quick Start](#quick-start)
   - [Repo Structure](#repo-structure)
-    - [Fundamentals](#fundamentals)
+    - [Kubernetes Fundamentals](#kubernetes-fundamentals)
     - [AKS CLI](#aks-cli)
     - [AKS Automatic](#aks-automatic)
-    - [Infrastructure as Code](#infrastructure-as-code)
-    - [AI and ML Workloads](#ai-and-ml-workloads)
+    - [AKS Terraform](#aks-terraform)
+    - [AKS Networking](#aks-networking)
+    - [AKS App Routing](#aks-app-routing)
+    - [AKS App Gateway](#aks-app-gateway)
+    - [AKS AGC Migration Utility](#aks-agc-migration-utility)
+    - [AKS AI and ML](#aks-ai-and-ml)
+    - [AKS KAITO](#aks-kaito)
     - [Ollama on Kubernetes](#ollama-on-kubernetes)
     - [AKS Agent Skills](#aks-agent-skills)
+    - [AKS Agentic Operations](#aks-agentic-operations)
     - [App Modernization](#app-modernization)
-    - [Networking](#networking)
-    - [Security](#security)
+    - [Kubernetes Security](#kubernetes-security)
     - [Policies](#policies)
     - [GitOps](#gitops)
-    - [Argo CD](#argo-cd)
-    - [Argo Rollouts](#argo-rollouts)
-    - [Argo Workflows](#argo-workflows)
-    - [App Gateway for Containers](#app-gateway-for-containers)
     - [Azure Red Hat OpenShift](#azure-red-hat-openshift)
+    - [ARO MCP](#aro-mcp)
+    - [Self-Hosted GitHub Action Runners](#self-hosted-github-action-runners)
     - [MySQL](#mysql)
+    - [Kubernetes Notes](#kubernetes-notes)
   - [Prerequisites](#prerequisites)
 
 ---
@@ -48,9 +52,9 @@ Most labs include their own setup scripts (`setup.ps1` or similar) and deploy sc
 
 ## Repo Structure
 
-### Fundamentals
+### Kubernetes Fundamentals
 
-[`Fundamentals/`](Fundamentals/)
+[`K8_Fundamentals/`](K8_Fundamentals/)
 
 Core Kubernetes concepts — workload resources (Deployments, StatefulSets, DaemonSets, Jobs), multi-container Pod patterns (sidecar, init containers), persistent storage with PVs and PVCs, deployment strategies (blue/green, canary, rolling updates), and essential `kubectl` commands. Includes working manifests for network policies, ingress, VPA, and sidecar patterns.
 
@@ -59,26 +63,57 @@ Core Kubernetes concepts — workload resources (Deployments, StatefulSets, Daem
 [`AKS_CLI/`](AKS_CLI/)
 
 Step-by-step guides for provisioning AKS clusters and setting up client tooling using the Azure CLI. Two modes covered:
+
 - **Cluster mode** — deploy the AKS agentic CLI as a pod within your cluster
 - **Client mode** — run the agent locally via Docker with your Azure credentials
 
 ### AKS Automatic
 
-[`aks-automatic/`](aks-automatic/)
+[`AKS_Automatic/`](AKS_Automatic/)
 
 Terraform modules for deploying AKS Automatic clusters — the fully managed SKU that handles node management, scaling, and security configuration for you.
 
-### Infrastructure as Code
+### AKS Terraform
 
-[`k8s-terraform/`](k8s-terraform/)
+[`AKS_Terraform/`](AKS_Terraform/)
 
 Terraform-based AKS deployment with modular structure covering the cluster itself, Key Vault integration, and Log Analytics. Includes environment setup scripts and output definitions.
 
-### AI and ML Workloads
+### AKS Networking
 
-[`AIandML/`](AIandML/)
+[`AKS_Networking/`](AKS_Networking/)
 
-Running AI and ML workloads on AKS using **Ray** and **KubeRay**. Covers distributed training with Ray Train, model serving with Ray Serve, distributed data processing with Ray Data, GPU node pools, BlobFuse storage integration, HPA/cluster autoscaler configuration, and Azure Monitor integration. Also includes notes on **KAITO** for automated GPU provisioning and RAGEngine for retrieval-augmented generation workloads.
+AKS networking labs covering **Advanced Container Networking Services (ACNS)** — Cilium-based FQDN filtering, L7 network policies, container network flow logs, and network observability with Azure Managed Grafana. Includes deployment scripts with Azure CNI Overlay and Cilium dataplane configuration, plus working network policy manifests.
+
+### AKS App Routing
+
+[`AKS_App_Routing/`](AKS_App_Routing/)
+
+Migrating from self-managed Nginx Ingress to the AKS-managed App Routing Add-On with zero downtime. Walks through parallel validation before cutting over from the retiring standalone Nginx controller, including setup scripts, ingress manifests, and a BYO Nginx values file.
+
+### AKS App Gateway
+
+[`AKS_Appgateway/`](AKS_Appgateway/)
+
+Deploying the Application Gateway for Containers (AGC) ALB controller into an AKS cluster — managed and bring-your-own deployment strategies.
+
+### AKS AGC Migration Utility
+
+[`AKS_AGC_MigrationUtility/`](AKS_AGC_MigrationUtility/)
+
+Migration utility that scans AKS clusters or YAML manifests and generates migration reports for moving from Nginx Ingress to Application Gateway for Containers (AGC). Includes example YAML configs and a PowerShell runner script.
+
+### AKS AI and ML
+
+[`AKS_AIandML/`](AKS_AIandML/)
+
+Running AI and ML workloads on AKS using **Ray** and **KubeRay**. Covers distributed training with Ray Train, model serving with Ray Serve, distributed data processing with Ray Data, GPU node pools, BlobFuse storage integration, HPA/cluster autoscaler configuration, and Azure Monitor integration.
+
+### AKS KAITO
+
+[`AKS_KAITO/`](AKS_KAITO/)
+
+KAITO (Kubernetes AI Toolchain Operator) for running LLM inference on AKS with automatic GPU node provisioning. Includes Workspace CRD manifests for models like Phi-4 Mini, DeepSeek R1, and GPT-OSS-120B, plus RAGEngine setup for retrieval-augmented generation workloads and Headlamp UI integration.
 
 ### Ollama on Kubernetes
 
@@ -88,9 +123,15 @@ Deploying and running large language models on AKS using Ollama, managed through
 
 ### AKS Agent Skills
 
-[`AKS_agent/`](AKS_agent/)
+[`AKS_Agent/`](AKS_Agent/)
 
-Agent skills for Azure Kubernetes Service — bringing production-grade AKS guidance, troubleshooting checklists, and guardrails directly into AI agents like GitHub Copilot and Claude. Includes setup guides, skill definitions, and a presentation deck on building agentic operations for AKS and ARO.
+Agent skills for Azure Kubernetes Service — bringing production-grade AKS guidance, troubleshooting checklists, and guardrails directly into AI agents like GitHub Copilot and Claude. Includes setup guides, skill definitions, and MCP integration scripts.
+
+### AKS Agentic Operations
+
+[`AKS_Agentic_Operations/`](AKS_Agentic_Operations/)
+
+Building private intelligence for AKS and ARO operations — the case for agentic ops, skill architecture, and practical walkthroughs. Also covers Azure Container Linux (ACL) testing with immutable container-optimized node images.
 
 ### App Modernization
 
@@ -98,17 +139,12 @@ Agent skills for Azure Kubernetes Service — bringing production-grade AKS guid
 
 Modernizing applications for AKS, demonstrated with the Spring PetClinic app. Walks through running the application locally (with H2 or PostgreSQL), containerizing, and deploying to AKS.
 
-### Networking
+### Kubernetes Security
 
-[`Networking/`](Networking/)
-
-AKS networking labs covering **Advanced Container Networking Services (ACNS)** — Cilium-based FQDN filtering, L7 network policies, container network flow logs, and network observability with Azure Managed Grafana. Includes deployment scripts with Azure CNI Overlay and Cilium dataplane configuration, plus working network policy manifests.
-
-### Security
-
-[`Security/`](Security/)
+[`K8_Security/`](K8_Security/)
 
 Three focus areas:
+
 - **CKS** — Certified Kubernetes Security Specialist lab environment with cluster setup, hardening, microservice vulnerability minimization, system hardening, supply chain security, and runtime monitoring
 - **Container Image** — Container image security best practices
 - **Workload Identity** — End-to-end setup for Microsoft Entra Workload ID with federated credentials, Key Vault access, and managed identity configuration
@@ -123,31 +159,11 @@ OPA/Rego policies for Kubernetes admission control — for example, enforcing th
 
 [`GitOps/`](GitOps/)
 
-GitOps concepts and workflow — using a Git repo as the single source of truth for Kubernetes deployments, covering the separation of app source code and manifests, CI/CD pipelines, and why tools like ArgoCD and Flux solve the "Docker Hub to Kubernetes" deployment gap.
+GitOps concepts and tooling — using a Git repo as the single source of truth for Kubernetes deployments. Contains sub-sections for:
 
-### Argo CD
-
-[`argocd/`](argocd/)
-
-Setting up ArgoCD on AKS — installation, CLI setup, deploying applications, and managing the ArgoCD dashboard. Includes deployment and service manifests plus Argo Events integration with Pulsar.
-
-### Argo Rollouts
-
-[`argorollouts/`](argorollouts/)
-
-Progressive delivery with Argo Rollouts — blue-green and canary deployment strategies with preview services, promotion, and rollback workflows. Includes rollout manifests and CLI plugin setup for Windows.
-
-### Argo Workflows
-
-[`argoworkflows/`](argoworkflows/)
-
-Kubernetes-native workflow orchestration with Argo Workflows — DAG-based workflows, workflow templates, CI/CD pipelines, and CLI tooling for both Linux and Windows.
-
-### App Gateway for Containers
-
-[`Appgateway/`](Appgateway/)
-
-Deploying the Application Gateway for Containers (AGC) ALB controller into an AKS cluster — managed and bring-your-own deployment strategies.
+- **ArgoCD** — installation, CLI setup, deploying applications, dashboard management, and Argo Events integration
+- **Argo Rollouts** — progressive delivery with blue-green and canary strategies, preview services, promotion, and rollback workflows
+- **Argo Workflows** — DAG-based workflow orchestration, workflow templates, and CI/CD pipelines
 
 ### Azure Red Hat OpenShift
 
@@ -155,11 +171,29 @@ Deploying the Application Gateway for Containers (AGC) ALB controller into an AK
 
 Provisioning and configuring Azure Red Hat OpenShift clusters — VNet/subnet setup, quota requirements, managed identity configuration, and notes on Red Hat Developer Lightspeed. Includes both Bash and PowerShell setup scripts.
 
+### ARO MCP
+
+[`ARO_MCP/`](ARO_MCP/)
+
+Setting up the Azure MCP Server for ARO — installation, Azure authentication, and VS Code integration for agentic workflows with Azure Red Hat OpenShift.
+
+### Self-Hosted GitHub Action Runners
+
+[`SelfHostedGHActionRunners/`](SelfHostedGHActionRunners/)
+
+Deploying self-hosted GitHub Actions runners on Kubernetes using Actions Runner Controller (ARC). Dynamically scales CI/CD workloads without per-minute billing for private repos.
+
 ### MySQL
 
 [`MySQL/`](MySQL/)
 
 MySQL fundamentals — core SQL concepts (DDL, DML, DQL, DCL), database and table creation, querying, and command-line operations. Useful reference material for database-backed workloads running on AKS.
+
+### Kubernetes Notes
+
+[`K8_Notes/`](K8_Notes/)
+
+General reference notes covering Kubernetes security concepts and KAITO fundamentals.
 
 ---
 
