@@ -1,33 +1,173 @@
-# AKS_LABS
+# AKS Labs
 
-## Startup
+Hands-on labs, deployment scripts, and reference material for Azure Kubernetes Service and the broader Kubernetes ecosystem. Everything here is built to be practical — scripts you can run, manifests you can deploy, and notes you can reference when you need them.
 
-- az aks start --resource-group <myresourcegroup> --name <myakscluster>
-- Set-Alias k kubectl
-- kubectl create namespace pets
-- kubectl apply -f https://raw.githubusercontent.com/Azure-Samples/aks-store-demo/refs/heads/main/aks-store-quickstart.yaml -n pets
-- kubectl get all -n pets
-- kubectl get svc store-front -n pets
+---
 
-## Kubernetes workload resources
+## Table of Contents
 
-Kubernetes is a container orchestrator, but it doesn't run containers directly. Instead, it runs containers inside a resource known as a **Pod**. **A Pod is the smallest deployable unit in Kubernetes**. It is a logical host for one or more containers which runs your application.
+- [AKS Labs](#aks-labs)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Start](#quick-start)
+  - [Repo Structure](#repo-structure)
+    - [Fundamentals](#fundamentals)
+    - [AKS CLI](#aks-cli)
+    - [AKS Automatic](#aks-automatic)
+    - [Infrastructure as Code](#infrastructure-as-code)
+    - [AI and ML Workloads](#ai-and-ml-workloads)
+    - [Ollama on Kubernetes](#ollama-on-kubernetes)
+    - [AKS Agent Skills](#aks-agent-skills)
+    - [App Modernization](#app-modernization)
+    - [Networking](#networking)
+    - [Security](#security)
+    - [Policies](#policies)
+    - [GitOps](#gitops)
+    - [Argo CD](#argo-cd)
+    - [Argo Rollouts](#argo-rollouts)
+    - [Argo Workflows](#argo-workflows)
+    - [App Gateway for Containers](#app-gateway-for-containers)
+    - [Azure Red Hat OpenShift](#azure-red-hat-openshift)
+    - [MySQL](#mysql)
+  - [Prerequisites](#prerequisites)
 
-But even then, a Pod is not what you want to deploy because a Pod is not a long-lived resource. Meaning, if a Pod dies, Kubernetes will not attempt to restart it.
+---
 
-Instead, you need to use a workload resource to manage Pods for you. There are several different types of workload resources in Kubernetes that manages Pods, each with its own use case and knowing when to use each is important.
+## Quick Start
 
-The most common types of workload resources are:
+```powershell
+az aks start --resource-group <myresourcegroup> --name <myakscluster>
+Set-Alias k kubectl
+kubectl create namespace pets
+kubectl apply -f https://raw.githubusercontent.com/Azure-Samples/aks-store-demo/refs/heads/main/aks-store-quickstart.yaml -n pets
+kubectl get all -n pets
+```
 
-- **Deployment** resource is a declarative way to manage a set of Pods. It in turn creates a ReplicaSet resource to manage the Pods. A Deployment is used for stateless applications and is the most common way to deploy applications in Kubernetes.
-- **ReplicaSet** resource is a low-level resource that is used to manage a set of Pods. It is used to ensure that a specified number of pod replicas are running at any given time. A ReplicaSet is mostly used by the Deployment resource to manage the Pods. You typically won't use a ReplicaSet directly, but it's important to understand how it works.
-- **StatefulSet** resource is used to manage stateful applications. It is used for applications that require stable, unique network identifiers and stable storage. A StatefulSet is used for applications that require persistent storage and stable network identities, such as databases. A stateful set is a workload resource that is used to manage stateful applications. It is used for applications that require stable, unique network identifiers and stable storage.
-- **DaemonSet** resource is often used to ensure that a copy of a Pod is running on all nodes in the cluster, such as logging or monitoring agents.
-- **Job** resource is a workload resource that is used to run a batch job. These are applications that need to run to completion, such as data processing jobs.
-- **CronJob** resource is a workload resource that is used to run a batch job on a schedule, such as backups or report generation.
+Most labs include their own setup scripts (`setup.ps1` or similar) and deploy scripts that handle resource group creation, cluster provisioning, and configuration. The root-level [`aksdeploy.ps1`](aksdeploy.ps1) and [`aksdeployKV.ps1`](aksdeployKV.ps1) scripts provision a standard AKS cluster with sensible defaults.
 
-The workload resource that you request are reconciled by various controllers in the Kubernetes control plane. For example, when you create a Deployment, the Deployment controller will create a ReplicaSet and the ReplicaSet controller will create the Pods.
+---
 
-When you submit a resource through the Kubernetes API server, the desired state is stored in etcd and controllers are responsible for ensuring that the actual state matches the desired state. This is known as the reconciliation loop.
+## Repo Structure
 
-Each resource type is it's own API in Kubernetes and has it's own set of properties which you set in a manifest file written in YAML or JSON. Once the manifest file is created, you can use the kubectl CLI to create the resource in the cluster.
+### Fundamentals
+
+[`Fundamentals/`](Fundamentals/)
+
+Core Kubernetes concepts — workload resources (Deployments, StatefulSets, DaemonSets, Jobs), multi-container Pod patterns (sidecar, init containers), persistent storage with PVs and PVCs, deployment strategies (blue/green, canary, rolling updates), and essential `kubectl` commands. Includes working manifests for network policies, ingress, VPA, and sidecar patterns.
+
+### AKS CLI
+
+[`AKS_CLI/`](AKS_CLI/)
+
+Step-by-step guides for provisioning AKS clusters and setting up client tooling using the Azure CLI. Two modes covered:
+- **Cluster mode** — deploy the AKS agentic CLI as a pod within your cluster
+- **Client mode** — run the agent locally via Docker with your Azure credentials
+
+### AKS Automatic
+
+[`aks-automatic/`](aks-automatic/)
+
+Terraform modules for deploying AKS Automatic clusters — the fully managed SKU that handles node management, scaling, and security configuration for you.
+
+### Infrastructure as Code
+
+[`k8s-terraform/`](k8s-terraform/)
+
+Terraform-based AKS deployment with modular structure covering the cluster itself, Key Vault integration, and Log Analytics. Includes environment setup scripts and output definitions.
+
+### AI and ML Workloads
+
+[`AIandML/`](AIandML/)
+
+Running AI and ML workloads on AKS using **Ray** and **KubeRay**. Covers distributed training with Ray Train, model serving with Ray Serve, distributed data processing with Ray Data, GPU node pools, BlobFuse storage integration, HPA/cluster autoscaler configuration, and Azure Monitor integration. Also includes notes on **KAITO** for automated GPU provisioning and RAGEngine for retrieval-augmented generation workloads.
+
+### Ollama on Kubernetes
+
+[`Ollama/`](Ollama/)
+
+Deploying and running large language models on AKS using Ollama, managed through ArgoCD. Covers model management, GPU scheduling, scaling for team use, and multi-stage deployment manifests (dev, preload, prod). Includes Python scripts for calling the Ollama API and monitoring configurations.
+
+### AKS Agent Skills
+
+[`AKS_agent/`](AKS_agent/)
+
+Agent skills for Azure Kubernetes Service — bringing production-grade AKS guidance, troubleshooting checklists, and guardrails directly into AI agents like GitHub Copilot and Claude. Includes setup guides, skill definitions, and a presentation deck on building agentic operations for AKS and ARO.
+
+### App Modernization
+
+[`Aks_AppMod/`](Aks_AppMod/)
+
+Modernizing applications for AKS, demonstrated with the Spring PetClinic app. Walks through running the application locally (with H2 or PostgreSQL), containerizing, and deploying to AKS.
+
+### Networking
+
+[`Networking/`](Networking/)
+
+AKS networking labs covering **Advanced Container Networking Services (ACNS)** — Cilium-based FQDN filtering, L7 network policies, container network flow logs, and network observability with Azure Managed Grafana. Includes deployment scripts with Azure CNI Overlay and Cilium dataplane configuration, plus working network policy manifests.
+
+### Security
+
+[`Security/`](Security/)
+
+Three focus areas:
+- **CKS** — Certified Kubernetes Security Specialist lab environment with cluster setup, hardening, microservice vulnerability minimization, system hardening, supply chain security, and runtime monitoring
+- **Container Image** — Container image security best practices
+- **Workload Identity** — End-to-end setup for Microsoft Entra Workload ID with federated credentials, Key Vault access, and managed identity configuration
+
+### Policies
+
+[`policies/`](policies/)
+
+OPA/Rego policies for Kubernetes admission control — for example, enforcing that only images from Microsoft Container Registry (MCR) are allowed.
+
+### GitOps
+
+[`GitOps/`](GitOps/)
+
+GitOps concepts and workflow — using a Git repo as the single source of truth for Kubernetes deployments, covering the separation of app source code and manifests, CI/CD pipelines, and why tools like ArgoCD and Flux solve the "Docker Hub to Kubernetes" deployment gap.
+
+### Argo CD
+
+[`argocd/`](argocd/)
+
+Setting up ArgoCD on AKS — installation, CLI setup, deploying applications, and managing the ArgoCD dashboard. Includes deployment and service manifests plus Argo Events integration with Pulsar.
+
+### Argo Rollouts
+
+[`argorollouts/`](argorollouts/)
+
+Progressive delivery with Argo Rollouts — blue-green and canary deployment strategies with preview services, promotion, and rollback workflows. Includes rollout manifests and CLI plugin setup for Windows.
+
+### Argo Workflows
+
+[`argoworkflows/`](argoworkflows/)
+
+Kubernetes-native workflow orchestration with Argo Workflows — DAG-based workflows, workflow templates, CI/CD pipelines, and CLI tooling for both Linux and Windows.
+
+### App Gateway for Containers
+
+[`Appgateway/`](Appgateway/)
+
+Deploying the Application Gateway for Containers (AGC) ALB controller into an AKS cluster — managed and bring-your-own deployment strategies.
+
+### Azure Red Hat OpenShift
+
+[`ARO/`](ARO/)
+
+Provisioning and configuring Azure Red Hat OpenShift clusters — VNet/subnet setup, quota requirements, managed identity configuration, and notes on Red Hat Developer Lightspeed. Includes both Bash and PowerShell setup scripts.
+
+### MySQL
+
+[`MySQL/`](MySQL/)
+
+MySQL fundamentals — core SQL concepts (DDL, DML, DQL, DCL), database and table creation, querying, and command-line operations. Useful reference material for database-backed workloads running on AKS.
+
+---
+
+## Prerequisites
+
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and authenticated (`az login`)
+- `kubectl` configured and connected to your cluster
+- PowerShell (most scripts are written for `pwsh`)
+- Docker Desktop (for container builds and local testing)
+- Terraform (for IaC labs)
+- Python 3.10+ (for AI/ML and Ollama labs)
