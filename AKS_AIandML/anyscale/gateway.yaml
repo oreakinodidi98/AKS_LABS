@@ -1,0 +1,38 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  namespace: anyscale-operator
+spec:
+  gatewayClassName: gatewayclass
+  listeners:
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+      from: Same
+  - name: https
+    port: 443
+    protocol: HTTPS
+    hostname: '*.i.azure.anyscaleuserdata.com'
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        name: anyscale-<cloud-resource-id>-certificate
+      allowedRoutes:
+        namespaces:
+          from: Same
+  - name: https-session
+    port: 443
+    protocol: HTTPS
+    hostname: '*.s.azure.anyscaleuserdata.com'
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        name: anyscale-svc-<cloud-resource-id>-certificate
+      allowedRoutes:
+        namespaces:
+          from: Same
