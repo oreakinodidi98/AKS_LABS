@@ -101,3 +101,4 @@ terraform.rc
 *.ps1
 *.config
 AKS_agent/VBD_Agentic_AKS_Operations.md
+MicroservicesLab/
