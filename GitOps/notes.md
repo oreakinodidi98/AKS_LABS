@@ -373,6 +373,159 @@ data:
   - HA is the default Argo CD extension mode and normally needs four nodes.
   - For single-node extension installs, use redis-ha.enabled=false.
   - Azure CLI extension commands are available in your environment.
+- Step1:
+  - Deploy script to create AKS cluster
+  - Install ArgoCD : ubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  - Verify that the Argo CD pods are up and running: kubectl get pods -n argocd 
+    - should see 7 pods
+  - Acess ArgoCD UI
+    - retrieve admin password: kubectl get secrets argocd-initial-admin-secret -n argocd --template="{{index .data.password | base64decode}}" ; echo
+    - port forward server: kubectl port-forward svc/argocd-server -n argocd 8080:443
+    - Access the UI at https://localhost:8080
+    - default username is admin
+    - After  successfully login, you should see the Argo CD Applications
+- Step 2:
+  - Install cluster API provider for Azure
+  - cert-manager is required for capi/capz/aso and it plays a critical role in automating the lifecycle of TLS certificates required for the communications between controllers, validating and mutating webhooks and the Kubernetes API server. Without cert-manager, a kubernetes operator would have to manually create, distribute and rotate these certificates, making for a very complex day-2 operations.
+  - # Add the Jetstack Helm repository
+  - helm repo add jetstack https://charts.jetstack.io
+  - helm repo update
+  - # Install cert-manager with CRDs (adjust the namespace if needed)
+  - helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true --version v1.15.3
+  - then: kubectl get pods -n cert-manager
+  - helm repo add capi-operator https://kubernetes-sigs.github.io/cluster-api-operator
+  - helm repo update
+  - helm install capi-operator capi-operator/cluster-api-operator --create-namespace -n capi-operator-system --wait --timeout=300s -f capi-operator-values.yaml
+  - Verify: kubectl get pods -n azure-infrastructure-system
+  - Applying identity.yaml to the cluster: kubectl apply -f identity.yaml
+  - At this stage, the Management Cluster is fully prepared to provision new Azure resources. You can use CAPI/CAPZ to create AKS clusters or leverage Azure Service Operator (ASOv2) to manage other Azure resources.
+
+### Sample 1: Create a new AKS cluster as an Argo CD Application
+This first sample demonstrates how to declaratively provision a new Azure Kubernetes Service (AKS) cluster using Argo CD and Helm, integrating directly with Azure via the Cluster API for Azure.
+
+By treating the AKS cluster itself as an Argo CD Application, we enable full GitOps-based lifecycle management for both infrastructure and applications. This approach simplifies cluster creation, standardizes configurations, and ensures changes are continuously reconciled from a Git repository.
+
+This method allows platform teams to bootstrap new environments on demand, using Argo CD’s synchronization and automation capabilities to handle deployment, scaling, and governance seamlessly.
+
+in temrminal run the following: 
+
+@"
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+name: "$env:DEV_CLUSTER_NAME"
+namespace: argocd
+spec:
+project: default
+destination:
+namespace: default
+server: https://kubernetes.default.svc
+source:
+repoURL: 'https://mboersma.github.io/cluster-api-charts'
+chart: azure-aks-aso
+targetRevision: v$env:CHART_REVISION
+helm:
+valuesObject:
+clusterName: "$env:DEV_CLUSTER_NAME"
+location: "$env:DEV_CLUSTER_LOCATION"
+subscriptionID: "$env:AZURE_SUBSCRIPTION_ID"
+clientID: "$env:AZURE_CLIENT_ID"
+tenantID: "$env:AZURE_TENANT_ID"
+authMode: "workloadidentity"
+kubernetesVersion: v$env:K8S_VERSION
+clusterNetwork: "overlay"
+withClusterClass: true
+withClusterTopology: true
+managedMachinePoolSpecs:
+pool0:
+count: 1
+enableAutoScaling: true
+enableEncryptionAtHost: false
+enableFIPS: false
+enableNodePublicIP: false
+enableUltraSSD: false
+maxCount: 3
+minCount: 1
+mode: System
+osSKU: AzureLinux
+vmSize: Standard_DS2_v2
+type: VirtualMachineScaleSets
+syncPolicy:
+automated:
+prune: true
+selfHeal: true
+syncOptions:
+- CreateNamespace=true
+retry:
+limit: -1
+backoff:
+duration: 5s
+factor: 2
+maxDuration: 10m
+"@ | Set-Content -Path "samples/sample-1/aks-argo-application.yaml"
+
+then commit and push change back to github
+
+git add .
+git commit -m "Sample 1: Create a new AKS cluster as an Argo CD Application"
+git push origin main
+
+
+#### Sample 2: Create new ASOv2 resources
+In this second sample, we will look into how to use ASOv2 to create resources in Azure. For this example, we will create a Resource Group and a Key Vault instance. The concepts here apply for other resources in Azure too.
+
+To create other resources using ASOv2, you can follow the structure of the Git repo for this sample:
+
+samples/
+└──> sample-2/
+    └──> kv-argo-application.yaml  <-- contains your ASOv2 ResourceGroup and KeyVault manifest
+
+1. create a new namespace: kubectl create ns rg-dev-app
+2. Create a new secret scoped to the namespace : kubectl apply -f C:\AKS_LABS\GitOps\rg-dev-app-aso-credentials.yaml
+
+@"
+apiVersion: resources.azure.com/v1api20200601
+kind: ResourceGroup
+metadata:
+  name: rg-dev-app
+  namespace: rg-dev-app
+  annotations:
+    serviceoperator.azure.com/credential-from: rg-dev-app-aso-credentials
+spec:
+  location: ${DEV_CLUSTER_LOCATION}
+---
+apiVersion: keyvault.azure.com/v1api20210401preview
+kind: Vault
+metadata:
+  name: app-keyvault-${RANDOM}
+  namespace: rg-dev-app
+  annotations:
+    serviceoperator.azure.com/credential-from: rg-dev-app-aso-credentials
+spec:
+  location: ${DEV_CLUSTER_LOCATION}
+  owner:
+    name: rg-dev-app
+    kind: ResourceGroup
+  properties:
+    tenantId: ${AZURE_TENANT_ID}
+    sku:
+      family: "A"
+      name: "standard"
+    accessPolicies:
+      - tenantId: ${AZURE_TENANT_ID}
+        objectId: ${PRINCIPAL_ID}  # User or Service Principal Object ID
+        permissions:
+          secrets:
+            - get
+            - list
+            - set
+    enableSoftDelete: true
+"@ | Set-Content -Path "samples/sample-2/kv-argo-application.yaml"
+
+git add samples/sample-2/kv-argo-application.yaml
+git commit -m "Sample-2: Create new ASOv2 resources"
+git push
+
 
 #### Alternative: Managed Identity (Workload Identity)
 
