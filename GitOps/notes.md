@@ -54,21 +54,337 @@
 - When updates are detected, Argo CD automatically synchronizes the cluster to match the desired configuration defined in Git.
 - This makes it an ideal tool for managing both infrastructure and application deployments, ensuring that production environments always reflect the exact state specified in version control.
 
+#### Key Advancements
+
+- GitOps control
+  - Argo CD keeps your applications aligned with the desired state defined in Git.
+  - Every change is version-controlled, auditable, and easy to track over time.
+  - Compared to direct cluster changes, this gives teams better consistency and governance.
+- Continuous delivery
+  - Argo CD watches your Git repository and automatically syncs approved changes to Kubernetes.
+  - This reduces manual `kubectl apply` steps and lowers deployment risk.
+  - It also improves delivery speed and makes release activity easier to trace.
+- Safer rollbacks
+  - If a deployment causes issues, Argo CD can quickly roll back to a known good version.
+  - In standard Kubernetes workflows, this is usually more manual and slower to recover.
+- Multi-environment management
+  - Argo CD helps you manage Dev, Staging, and Production from one Git-based workflow.
+  - This reduces drift between environments and improves operational reliability.
+- UI and API support
+  - Argo CD includes both a clear web UI and a strong API for automation.
+  - Teams can monitor, manage, and troubleshoot releases without relying only on CLI commands.
+
+#### Core components
+
+- Controllers
+  - Argo CD relies on Kubernetes controllers for its core behavior.
+  - These controllers continuously monitor cluster state and compare it with the desired state.
+  - When drift is detected, they trigger changes to bring resources back in line.
+  - This works by watching Kubernetes objects, where the intended state is defined in the `spec` field.
+- API Server
+  - The Argo CD API server is the central communication layer.
+  - It connects the Web UI, CLI, Argo Events, and external CI/CD systems.
+  - It tracks application state, reports status, and triggers operations when updates are required.
+  - It also manages repository and cluster connections, linking your Git source to your runtime environment.
+  - From a security standpoint, it handles authentication, supports Single Sign-On (SSO), and enforces Role-Based Access Control (RBAC).
+  - In short, it is the main control plane for Argo CD operations.
+- Repository Server
+  - The Argo CD Repository Server works with the API server to retrieve desired application state from Git.
+  - It pulls manifests and prepares them in a format Kubernetes can apply.
+  - It maintains a local cache of repository content to improve performance and reduce repeated fetches.
+- Application Controller
+  - The Application Controller is responsible for reconciliation.
+  - It continuously compares desired state from Git with live state in the cluster, based on the Application CRDs.
+  - If it finds a difference, it takes corrective action so the live environment matches the target state.
+
+![ Overview diagram of Argo CD and its components](./image/overview.png)
+
 #### Argo CD extension on AKS
 
+- GitOps with Argo CD is currently in PREVIEW
 - GitOps is becoming the standard for deploying and operating applications at scale
 - Enterprises need a way to implement GitOps while staying compliant with best practices for security and identity management
 - Also available on Azure Arc enabled Kubernetes clusters
 - Argo CD extension delivers on this need across 3 pillars
   - Trusted Identity and Secure Access
+    - The Argo CD extension works with Microsoft Entra ID to give teams secure access.
+    - It supports Workload Identity federation with Azure Container Registry (ACR) and Azure DevOps, so you do not need long-lived credentials or hard-coded secrets in Git repos.
+    - It also supports Single Sign-On (SSO) using existing Azure identities.
   - Enterprise-Grade Hardening and Security
+    - To reduce security risk, the extension images are built on Azure Linux.
+    - You can opt in to automatic patch updates to stay current on fixes while still controlling your change process.
   - Parity with upstream Argo CD
+    - The extension stays aligned with upstream Argo CD, so teams can use familiar Argo CD features.
+    - It supports high availability (HA) setups for critical production workloads.
+    - It supports hub-and-spoke designs for multi-cluster GitOps.
+    - It supports Application and ApplicationSet for automated app delivery across many clusters.
 
 ![ArgoCD Extension](./image/argocd.png)
 
-#### Getting Started
+#### Argo CD Reconciliation Loop
+
+- The  reconciliation process involves aligning the intended configuration specified in a Git repository with the current state in the Kubernetes cluster
+- In practice, reconciliation means Argo CD keeps the live cluster aligned with what is defined in Git.
+- When Helm is used, Argo CD reads the Git repo, renders manifests from Helm templates, and compares those manifests with the live cluster state (sync status).
+- If drift is detected, Argo CD applies the required changes with kubectl apply to move the cluster back to the target state.
+- Argo CD uses kubectl apply instead of helm install so it can support multiple templating approaches while staying tool-agnostic.
+- This reconciliation loop is a direct implementation of GitOps principles: Git as the single source of truth, declarative and versioned configuration, and continuous automated convergence of live state to desired state.
+
+![Argo CD reconciliation loop](./image/reconciliationloop.png)
+
+##### Synchronization Principles
+
+- The sync phase is one of the most important Argo CD operations. Its behavior can be customized with resource hooks and sync waves.
+
+- Resource hooks
+  - A sync is the process of moving an application to its target state.
+  - Argo CD supports five hook phases:
+    - PreSync: Runs before sync starts (for example, create a backup).
+    - Sync: Runs during manifest application after all PreSync hooks succeed (for example, advanced rollout logic such as blue-green or canary).
+    - PostSync: Runs after sync succeeds and resources are healthy (for example, integration or post-deployment health checks).
+    - Skip: Tells Argo CD to skip applying a manifest.
+    - SyncFail: Runs when sync fails (for example, cleanup operations).
+  - Hooks commonly use Kubernetes `Job` resources and are identified through annotations.
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: schema-migrate-
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+```
+
+- Sync waves
+  - Sync waves let you control deployment order across manifests.
+  - Wave values can be negative or positive and are applied from lowest to highest.
+  - If no wave is set, the default is wave `0`.
+  - Waves are configured with annotations, similar to hooks.
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+```
+
+- How Argo CD orders and applies resources
+  - Hooks and waves can be used together.
+  - During sync, Argo CD orders resources using:
+    - Hook phase annotation
+    - Sync wave annotation
+    - Kubernetes kind (for example: namespaces first, then other resources, then custom resources)
+    - Resource name
+  - Argo CD then selects the lowest wave that still has out-of-sync or unhealthy resources and applies that wave.
+  - This continues until all phases and waves are synced and healthy.
+
+- Operational note
+  - If resources in the first wave remain unhealthy, the application may never reach a healthy state.
+  - Argo CD adds a 2-second delay between waves by default for safety.
+  - You can change this delay with the `ARGOCD_SYNC_WAVE_DELAY` environment variable.
+
+
+#### Key terminology
+
+- Configuration
+  - In Argo CD, this is the `Application` custom resource (CRD) that defines the Kubernetes resources to deploy.
+  - It is the main object Argo CD uses to manage deployed software.
+- Application source type
+  - The build/deploy source Argo CD uses, for example Helm or Kustomize.
+
+- Core states
+  - Target state: The desired application state defined in Git (source of truth).
+  - Live state: The current state running in the Kubernetes cluster.
+
+- Core statuses
+  - Sync status: Shows whether live state matches target state.
+  - Sync operation status: Shows whether the current sync operation succeeded or failed.
+  - Health status: Shows whether the app is running correctly and able to serve requests.
+
+- Core actions
+  - Refresh: Re-checks Git and cluster state to detect differences.
+  - Sync: Applies changes to move the app from live state to target state.
+
+#### Securing Argo CD
+
+- Use RBAC
+  - Why: RBAC is one of the most important controls in Argo CD. It ensures only authorized users can access or change specific resources, which reduces the risk of unauthorized deployments and configuration drift.
+  - How: Define role permissions in the argocd-rbac-cm ConfigMap based on real team responsibilities. Map roles to users or groups with RoleBindings or ClusterRoleBindings. Apply least privilege, review permissions regularly, and test policies to confirm access behaves as expected.
+
+- Manage secrets securely
+  - Why: Secrets such as API keys, passwords, and certificates are high-risk assets. Poor handling can lead to credential exposure and security incidents.
+  - How: Store sensitive data using Kubernetes Secrets and ensure encryption at rest and in transit. Add stronger controls where needed, such as Kubernetes encryption features, environment-level protections, or integration with an external secrets manager.
+
+- Regularly update Argo CD
+  - Why: Updates include security patches, bug fixes, and platform improvements. Staying current lowers exposure to known vulnerabilities and improves reliability.
+  - How: Set a regular update process using release monitoring or automated checks. Roll out updates with standard Kubernetes deployment practices, validate in a staging environment first, then promote to production.
+
+#### Custom Resource Definitions (CRDs)
+
+- Application
+  - The `Application` CRD represents the app instance Argo CD deploys and manages in Kubernetes.
+  - It defines source details (repo, revision, path), destination details (cluster, namespace), and sync-related settings.
+  - Example:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/argoproj/argocd-example-apps.git'
+    targetRevision: HEAD
+    path: guestbook
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: guestbook
+```
+
+- AppProject
+  - The `AppProject` CRD helps you group applications for organization, policy control, and governance.
+  - A common pattern is separating production apps from shared utility services.
+  - Example:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: production
+  namespace: argocd
+spec:
+  description: Production applications
+  sourceRepos:
+    - '*'
+  destinations:
+    - namespace: production
+      server: 'https://kubernetes.default.svc'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+```
+
+- Repository credentials
+  - For private Git repositories, Argo CD reads repository credentials from Kubernetes `Secret` objects.
+  - The secret must use the label `argocd.argoproj.io/secret-type: repository`.
+  - Example:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: private-repo-creds
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  url: 'https://github.com/private/repo.git'
+  username: <username>
+  password: <password>
+```
+
+- Cluster credentials
+  - When Argo CD manages additional clusters, it uses a separate secret type for cluster access.
+  - The secret must use the label `argocd.argoproj.io/secret-type: cluster`.
+  - This enables secure access to external clusters outside the default in-cluster context.
+  - Example:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-cluster-creds
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+type: Opaque
+stringData:
+  name: external-cluster
+  server: 'https://external-cluster-api.com'
+  config: |
+    {
+      "bearerToken": "<token>",
+      "tlsClientConfig": {
+         "insecure": false,
+         "caData": "<certificate encoded in base64>"
+      }
+    }
+```
+
+- These core objects (`Application`, `AppProject`, repository credentials, and cluster credentials) are the foundation for managing Argo CD deployments across single or multiple Kubernetes environments.
+
+#### Argo CD Entensions & integrations
+
+- Plugins
+  - Argo CD is highly extensible, and plugins let teams add capabilities beyond the default feature set.
+  - This makes it easier to adapt Argo CD to different enterprise workflows.
+  - A common example is the Notifications plugin, which alerts teams about sync, health, and deployment events.
+
+- Configuring plugins with ConfigMaps
+  - In Argo CD, plugin behavior is commonly configured through Kubernetes ConfigMaps.
+  - Example using the Notifications ConfigMap:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+data:
+  context: |
+    region: east
+    environmentName: staging
+
+  template.a-slack-template-with-context: |
+    message: "Something happened in {{ .context.environmentName }} in the {{ .context.region }} data center!"
+```
+
+  - In this example:
+    - `context` defines reusable values like region and environment.
+    - `template.a-slack-template-with-context` defines a notification template using Go templating.
+    - The template references context values so notifications are dynamic and environment-aware.
+
+- How plugins work in Argo CD
+  - Plugins follow a lifecycle: registration, initialization, and execution.
+  - At startup, Argo CD discovers and loads available plugins.
+  - During runtime, events such as sync and deployment trigger the relevant plugin logic.
+
+- Plugins in action
+  - Example: a deployment fails in staging (east region).
+  - The Notifications plugin can send a Slack or email alert like: "Something happened in staging in the east data center!"
+  - This gives teams immediate visibility and shortens response time.
+
+
+#### Demo
 
 - [link](https://learn.microsoft.com/en-us/azure/azure-arc/kubernetes/tutorial-use-gitops-argocd)
+- In this demo, we deploy AKS and install Argo CD as a GitOps extension by running setup.ps1.
+- Argo CD uses your Git repo as the source of truth for cluster config and app deployments.
+- Argo CD also supports other common sources, including Helm and OCI repositories.
+- The script creates the main resources you need: resource group, user-assigned identity, ACR, Log Analytics, Azure Monitor workspace, Application Insights, Key Vault, and AKS.
+- AKS is created with OIDC issuer and workload identity enabled.
+- Argo CD is installed with the simple extension command in the script:
+  - redis-ha.enabled=false
+  - configs.params.application.namespaces=namespace1,namespace2
+- This means the demo uses single-node Argo CD Redis mode, even though the cluster itself has four nodes.
+- Prerequisites:
+  - You are logged in to Azure and have permission to create resources and role assignments.
+  - Your network allows outbound access to your Git source on port 22 (SSH) or 443 (HTTPS).
+  - Argo CD extension supports multi-tenant setups in high availability (HA) mode and also supports workload identity.
+  - HA is the default Argo CD extension mode and normally needs four nodes.
+  - For single-node extension installs, use redis-ha.enabled=false.
+  - Azure CLI extension commands are available in your environment.
+
+#### Alternative: Managed Identity (Workload Identity)
+
+- For production, you can deploy the Argo CD extension with workload identity instead of simple mode.
+- In this model, Argo CD uses a user-assigned managed identity and federated credentials, so you do not keep long-lived secrets in Git.
+- You deploy this option with a Bicep template and set values like:
+  - azure.workloadIdentity.enabled=true
+  - azure.workloadIdentity.clientId=<managed-identity-client-id>
+  - azure.workloadIdentity.entraSSOClientId=<entra-app-client-id>
+  - configs.cm.oidc.config=<oidc-settings>
+- If you choose HA for Argo CD, keep redis-ha.enabled=true and ensure the cluster has enough nodes.
+- If you need single-node extension install, set redis-ha.enabled=false.
 
 ### Argo Workflows
 
