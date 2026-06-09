@@ -1,0 +1,36 @@
+core:
+  cluster-api:
+    version: v1.9.6
+    manager:
+      featureGates:
+        ClusterTopology: true
+        MachinePool: true
+bootstrap:
+  kubeadm:
+    version: v1.9.6
+    manager:
+      featureGates:
+        ClusterTopology: true
+        MachinePool: true
+controlPlane:
+  kubeadm:
+    version: v1.9.6
+    manager:
+      featureGates:
+        ClusterTopology: true
+infrastructure:
+  azure:
+    version: v1.19.2
+    manager:
+      featureGates:
+        ClusterTopology: true
+addon:
+  helm:
+    version: v0.3.1
+additionalDeployments:
+  azureserviceoperator-controller-manager:
+    deployment:
+      containers:
+        - name: manager
+          args:
+            --crd-pattern: "resources.azure.com/*;containerservice.azure.com/*;keyvault.azure.com/*;managedidentity.azure.com/*;eventhub.azure.com/*;storage.azure.com/*"

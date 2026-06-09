@@ -15,7 +15,7 @@
   - **Immutable storage**
     - In GitOps, the Git serves are a version-control system and also as an immutable storage for configurations.
     - Once a configuration is committed to Git, it becomes a fixed reference point, providing a reliable record that supports reproducibility and traceability
-    - Making Git the single source of truth for your system’s desired state. 
+    - Making Git the single source of truth for your system’s desired state.
     - Although Git is the most commonly used tool for this purpose, the core principles of GitOps can also be applied with other version control systems.
   - **Automation**
     - Focuses on removing manual steps after changes are committed to version control.
@@ -29,7 +29,7 @@
 
 ## ARGO
 
-- Argo is a set of Kubernetes native tools that enhance the workflow management capabilities of Kubernetes. 
+- Argo is a set of Kubernetes native tools that enhance the workflow management capabilities of Kubernetes.
 - Argo is made up of:
   - **Argo Continuous Delivery** (CD) for state management
   - **Argo Workflows** for running complex jobs
@@ -44,7 +44,7 @@
 - It helps teams deploy in a safer and more reliable way, while reducing manual work.
 - Tools like Argo CD and Argo Rollouts make advanced release patterns easier, including canary and blue-green deployments.
 - Argo automation helps teams ship features faster and roll back quickly when checks show something is wrong.
-- Since everything is tracked in Git, you get a clear audit trail of changes. 
+- Since everything is tracked in Git, you get a clear audit trail of changes.
 - Argo also works well with tools like Prometheus, Helm, NATS, and CloudEvents.
 
 ### Argo CD
@@ -181,7 +181,6 @@ metadata:
   - If resources in the first wave remain unhealthy, the application may never reach a healthy state.
   - Argo CD adds a 2-second delay between waves by default for safety.
   - You can change this delay with the `ARGOCD_SYNC_WAVE_DELAY` environment variable.
-
 
 #### Key terminology
 
@@ -338,10 +337,10 @@ data:
     message: "Something happened in {{ .context.environmentName }} in the {{ .context.region }} data center!"
 ```
 
-  - In this example:
-    - `context` defines reusable values like region and environment.
-    - `template.a-slack-template-with-context` defines a notification template using Go templating.
-    - The template references context values so notifications are dynamic and environment-aware.
+- In this example:
+  - `context` defines reusable values like region and environment.
+  - `template.a-slack-template-with-context` defines a notification template using Go templating.
+  - The template references context values so notifications are dynamic and environment-aware.
 
 - How plugins work in Argo CD
   - Plugins follow a lifecycle: registration, initialization, and execution.
@@ -353,179 +352,210 @@ data:
   - The Notifications plugin can send a Slack or email alert like: "Something happened in staging in the east data center!"
   - This gives teams immediate visibility and shortens response time.
 
-
 #### Demo
 
-- [link](https://learn.microsoft.com/en-us/azure/azure-arc/kubernetes/tutorial-use-gitops-argocd)
-- In this demo, we deploy AKS and install Argo CD as a GitOps extension by running setup.ps1.
-- Argo CD uses your Git repo as the source of truth for cluster config and app deployments.
-- Argo CD also supports other common sources, including Helm and OCI repositories.
-- The script creates the main resources you need: resource group, user-assigned identity, ACR, Log Analytics, Azure Monitor workspace, Application Insights, Key Vault, and AKS.
-- AKS is created with OIDC issuer and workload identity enabled.
-- Argo CD is installed with the simple extension command in the script:
-  - redis-ha.enabled=false
-  - configs.params.application.namespaces=namespace1,namespace2
-- This means the demo uses single-node Argo CD Redis mode, even though the cluster itself has four nodes.
-- Prerequisites:
-  - You are logged in to Azure and have permission to create resources and role assignments.
-  - Your network allows outbound access to your Git source on port 22 (SSH) or 443 (HTTPS).
-  - Argo CD extension supports multi-tenant setups in high availability (HA) mode and also supports workload identity.
-  - HA is the default Argo CD extension mode and normally needs four nodes.
-  - For single-node extension installs, use redis-ha.enabled=false.
-  - Azure CLI extension commands are available in your environment.
-- Step1:
-  - Deploy script to create AKS cluster
-  - Install ArgoCD : ubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-  - Verify that the Argo CD pods are up and running: kubectl get pods -n argocd 
-    - should see 7 pods
-  - Acess ArgoCD UI
-    - retrieve admin password: kubectl get secrets argocd-initial-admin-secret -n argocd --template="{{index .data.password | base64decode}}" ; echo
-    - port forward server: kubectl port-forward svc/argocd-server -n argocd 8080:443
-    - Access the UI at https://localhost:8080
-    - default username is admin
-    - After  successfully login, you should see the Argo CD Applications
-- Step 2:
-  - Install cluster API provider for Azure
-  - cert-manager is required for capi/capz/aso and it plays a critical role in automating the lifecycle of TLS certificates required for the communications between controllers, validating and mutating webhooks and the Kubernetes API server. Without cert-manager, a kubernetes operator would have to manually create, distribute and rotate these certificates, making for a very complex day-2 operations.
-  - # Add the Jetstack Helm repository
-  - helm repo add jetstack https://charts.jetstack.io
-  - helm repo update
-  - # Install cert-manager with CRDs (adjust the namespace if needed)
-  - helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true --version v1.15.3
-  - then: kubectl get pods -n cert-manager
-  - helm repo add capi-operator https://kubernetes-sigs.github.io/cluster-api-operator
-  - helm repo update
-  - helm install capi-operator capi-operator/cluster-api-operator --create-namespace -n capi-operator-system --wait --timeout=300s -f capi-operator-values.yaml
-  - Verify: kubectl get pods -n azure-infrastructure-system
-  - Applying identity.yaml to the cluster: kubectl apply -f identity.yaml
-  - At this stage, the Management Cluster is fully prepared to provision new Azure resources. You can use CAPI/CAPZ to create AKS clusters or leverage Azure Service Operator (ASOv2) to manage other Azure resources.
+[Reference tutorial](https://learn.microsoft.com/en-us/azure/azure-arc/kubernetes/tutorial-use-gitops-argocd)
 
-### Sample 1: Create a new AKS cluster as an Argo CD Application
-This first sample demonstrates how to declaratively provision a new Azure Kubernetes Service (AKS) cluster using Argo CD and Helm, integrating directly with Azure via the Cluster API for Azure.
+This demo has two scripts and they run in sequence:
 
-By treating the AKS cluster itself as an Argo CD Application, we enable full GitOps-based lifecycle management for both infrastructure and applications. This approach simplifies cluster creation, standardizes configurations, and ensures changes are continuously reconciled from a Git repository.
+1. `setup.ps1`: Builds the management platform in Azure (AKS, Argo CD extension, identity, monitoring, Key Vault) and writes shared values to `GitOps/.envrc`.
+1. `devsetup.ps1`: Uses values from `GitOps/.envrc`, creates the demo Git repo content (`samples/`), applies the parent Argo app, applies ASO credentials, then pushes manifests to GitHub.
 
-This method allows platform teams to bootstrap new environments on demand, using Argo CD’s synchronization and automation capabilities to handle deployment, scaling, and governance seamlessly.
+If you run `devsetup.ps1` before `setup.ps1`, sync will fail because required values are missing.
 
-in temrminal run the following: 
+What `setup.ps1` creates:
 
-@"
+- Resource group
+- User-assigned managed identity
+- ACR
+- Log Analytics + Azure Monitor workspace + App Insights
+- Key Vault
+- AKS with OIDC issuer and workload identity enabled
+- Argo CD extension (`redis-ha.enabled=false`)
+- `.envrc` file with generated values
+
+### Demo flow (start to finish)
+
+1. Open PowerShell in `C:\AKS_LABS\GitOps`.
+1. Run setup script:
+
+```powershell
+./setup.ps1
+```
+
+Reason:
+Creates all Azure + AKS prerequisites and writes shared variables to `.envrc`.
+
+Expected output highlights:
+
+- `AKS Cluster ... created successfully`
+- `ArgoCD extension installed on AKS cluster ...`
+- `.envrc file created with resource names.`
+
+1. Connect and validate the management cluster:
+
+```powershell
+az aks get-credentials -g $env:RG_NAME -n $env:AKS_NAME --overwrite-existing
+kubectl get pods -n argocd
+```
+
+Reason:
+Confirms Argo CD extension is running before demo apps are introduced.
+
+Expected output:
+
+- Argo pods like `argocd-server`, `argocd-repo-server`, `argocd-application-controller` in `Running` status.
+
+1. (Optional UI check) Access Argo CD UI:
+
+```powershell
+kubectl get secret argocd-initial-admin-secret -n argocd --template="{{index .data.password | base64decode}}"
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+Open `https://localhost:8080` and sign in as `admin`.
+
+1. Install CAPI/CAPZ/ASO prerequisites (required for Sample 1 and Sample 2):
+
+```powershell
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true --version v1.15.3
+kubectl get pods -n cert-manager
+
+helm repo add capi-operator https://kubernetes-sigs.github.io/cluster-api-operator
+helm repo update
+helm install capi-operator capi-operator/cluster-api-operator --create-namespace -n capi-operator-system --wait --timeout=300s -f capi-operator-values.yaml
+kubectl get pods -n azure-infrastructure-system
+
+kubectl apply -f identity.yaml
+```
+
+Reason:
+Sample 1 depends on CAPI/CAPZ CRDs/controllers, and Sample 2 depends on Azure Service Operator. Without this step, Argo may report missing resources or sync errors.
+
+Expected output highlights:
+
+- `cert-manager` pods in `Running`
+- `azureserviceoperator-controller-manager` pod in `azure-infrastructure-system`
+- `azureclusteridentity.infrastructure.cluster.x-k8s.io/cluster-identity` created
+
+1. Run dev setup script:
+
+```powershell
+./devsetup.ps1
+```
+
+Reason:
+Creates and updates the Git repo Argo watches, renders manifests with real values, applies parent app, and commits/pushes `samples/`.
+
+Expected output highlights:
+
+- `Step 1/6 ...` through `Step 6/6 ...`
+- `application.argoproj.io/app-project-env-recursive ...`
+- Git commit + push for Sample 1 and Sample 2
+
+1. Verify Argo reconciliation:
+
+```powershell
+kubectl get app app-project-env-recursive -n argocd -o wide
+kubectl get app app-project-env-recursive -n argocd -o jsonpath="{range .status.resources[*]}{.kind}{' '}{.namespace}{'/'}{.name}{' => '}{.status}{'\n'}{end}"
+```
+
+Expected output:
+
+- Parent app `Healthy`
+- Child resources (`Application`, `ResourceGroup`, `Vault`) converge to `Synced`
+
+### How the scripts link
+
+- `setup.ps1` produces `GitOps/.envrc` with identity and tenant values.
+- `devsetup.ps1` reads those values, then generates valid YAML in `app-project-env/samples/`.
+- Argo CD parent app (`github-app-project-argo-cd-app.yaml`) watches that repo path recursively.
+
+### YAML used in the demo
+
+Parent app template (`github-app-project-argo-cd-app.yaml`):
+
+```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-name: "$env:DEV_CLUSTER_NAME"
-namespace: argocd
+  name: app-project-env-recursive
+  namespace: argocd
 spec:
-project: default
-destination:
-namespace: default
-server: https://kubernetes.default.svc
-source:
-repoURL: 'https://mboersma.github.io/cluster-api-charts'
-chart: azure-aks-aso
-targetRevision: v$env:CHART_REVISION
-helm:
-valuesObject:
-clusterName: "$env:DEV_CLUSTER_NAME"
-location: "$env:DEV_CLUSTER_LOCATION"
-subscriptionID: "$env:AZURE_SUBSCRIPTION_ID"
-clientID: "$env:AZURE_CLIENT_ID"
-tenantID: "$env:AZURE_TENANT_ID"
-authMode: "workloadidentity"
-kubernetesVersion: v$env:K8S_VERSION
-clusterNetwork: "overlay"
-withClusterClass: true
-withClusterTopology: true
-managedMachinePoolSpecs:
-pool0:
-count: 1
-enableAutoScaling: true
-enableEncryptionAtHost: false
-enableFIPS: false
-enableNodePublicIP: false
-enableUltraSSD: false
-maxCount: 3
-minCount: 1
-mode: System
-osSKU: AzureLinux
-vmSize: Standard_DS2_v2
-type: VirtualMachineScaleSets
-syncPolicy:
-automated:
-prune: true
-selfHeal: true
-syncOptions:
-- CreateNamespace=true
-retry:
-limit: -1
-backoff:
-duration: 5s
-factor: 2
-maxDuration: 10m
-"@ | Set-Content -Path "samples/sample-1/aks-argo-application.yaml"
+  project: default
+  source:
+    repoURL: 'https://github.com/${GITHUB_USERNAME}/app-project-env.git'
+    targetRevision: main
+    path: samples
+    directory:
+      recurse: true
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
 
-then commit and push change back to github
+ASO credential template (`rg-dev-app-aso-credentials.yaml`):
 
-git add .
-git commit -m "Sample 1: Create a new AKS cluster as an Argo CD Application"
-git push origin main
-
-
-#### Sample 2: Create new ASOv2 resources
-In this second sample, we will look into how to use ASOv2 to create resources in Azure. For this example, we will create a Resource Group and a Key Vault instance. The concepts here apply for other resources in Azure too.
-
-To create other resources using ASOv2, you can follow the structure of the Git repo for this sample:
-
-samples/
-└──> sample-2/
-    └──> kv-argo-application.yaml  <-- contains your ASOv2 ResourceGroup and KeyVault manifest
-
-1. create a new namespace: kubectl create ns rg-dev-app
-2. Create a new secret scoped to the namespace : kubectl apply -f C:\AKS_LABS\GitOps\rg-dev-app-aso-credentials.yaml
-
-@"
-apiVersion: resources.azure.com/v1api20200601
-kind: ResourceGroup
+```yaml
+apiVersion: v1
+kind: Secret
 metadata:
+  name: rg-dev-app-aso-credentials
+  namespace: rg-dev-app
+stringData:
+  AZURE_SUBSCRIPTION_ID: ${AZURE_SUBSCRIPTION_ID}
+  AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+  AZURE_CLIENT_ID: ${USER_ASSIGNED_IDENTITY_CLIENT_ID}
+  USE_WORKLOAD_IDENTITY_AUTH: "true"
+```
+
+Sample 1 (`samples/sample-1/aks-argo-application.yaml`) key points:
+
+- `metadata.name` must not be empty.
+- `clientID`, `tenantID`, `subscriptionID` must be populated from `.envrc`/Azure.
+
+Sample 2 (`samples/sample-2/kv-argo-application.yaml`) key points:
+
+- `Vault.metadata.name` must include a non-empty suffix.
+- `owner` uses:
+
+```yaml
+owner:
   name: rg-dev-app
-  namespace: rg-dev-app
-  annotations:
-    serviceoperator.azure.com/credential-from: rg-dev-app-aso-credentials
-spec:
-  location: ${DEV_CLUSTER_LOCATION}
----
-apiVersion: keyvault.azure.com/v1api20210401preview
-kind: Vault
-metadata:
-  name: app-keyvault-${RANDOM}
-  namespace: rg-dev-app
-  annotations:
-    serviceoperator.azure.com/credential-from: rg-dev-app-aso-credentials
-spec:
-  location: ${DEV_CLUSTER_LOCATION}
-  owner:
-    name: rg-dev-app
-    kind: ResourceGroup
-  properties:
-    tenantId: ${AZURE_TENANT_ID}
-    sku:
-      family: "A"
-      name: "standard"
-    accessPolicies:
-      - tenantId: ${AZURE_TENANT_ID}
-        objectId: ${PRINCIPAL_ID}  # User or Service Principal Object ID
-        permissions:
-          secrets:
-            - get
-            - list
-            - set
-    enableSoftDelete: true
-"@ | Set-Content -Path "samples/sample-2/kv-argo-application.yaml"
+```
 
-git add samples/sample-2/kv-argo-application.yaml
-git commit -m "Sample-2: Create new ASOv2 resources"
-git push
+Do not add `owner.kind` here; that caused persistent `OutOfSync` drift.
 
+### Fast troubleshooting
+
+If sync fails, run:
+
+```powershell
+kubectl get app app-project-env-recursive -n argocd -o wide
+kubectl describe app app-project-env-recursive -n argocd
+kubectl get app app-project-env-recursive -n argocd -o jsonpath="{range .status.resources[*]}{.kind}{' '}{.namespace}{'/'}{.name}{' => '}{.status}{'\n'}{end}"
+```
+
+If you see `resource name may not be empty`, inspect rendered files in your app repo:
+
+```powershell
+Get-Content C:\Users\oreakinodidi\app-project-env\samples\sample-1\aks-argo-application.yaml
+Get-Content C:\Users\oreakinodidi\app-project-env\samples\sample-2\kv-argo-application.yaml
+```
+
+Then re-run `./devsetup.ps1`, and force refresh:
+
+```powershell
+kubectl annotate app app-project-env-recursive -n argocd argocd.argoproj.io/refresh=hard --overwrite
+```
 
 #### Alternative: Managed Identity (Workload Identity)
 
@@ -533,9 +563,9 @@ git push
 - In this model, Argo CD uses a user-assigned managed identity and federated credentials, so you do not keep long-lived secrets in Git.
 - You deploy this option with a Bicep template and set values like:
   - azure.workloadIdentity.enabled=true
-  - azure.workloadIdentity.clientId=<managed-identity-client-id>
-  - azure.workloadIdentity.entraSSOClientId=<entra-app-client-id>
-  - configs.cm.oidc.config=<oidc-settings>
+  - azure.workloadIdentity.clientId=`managed-identity-client-id`
+  - azure.workloadIdentity.entraSSOClientId=`entra-app-client-id`
+  - configs.cm.oidc.config=`oidc-settings`
 - If you choose HA for Argo CD, keep redis-ha.enabled=true and ensure the cluster has enough nodes.
 - If you need single-node extension install, set redis-ha.enabled=false.
 
@@ -562,7 +592,8 @@ git push
 - It was created because basic Kubernetes deployments are limited.
 - It supports blue-green and canary deployments, can control traffic with service meshes and ingress, and can automatically promote or roll back releases based on checks. This helps teams ship new features to production more safely and with less manual work.
 
-## Tools 
+## Tools
+
 - Flux CD
 - Argo CD
 - Jenkins
