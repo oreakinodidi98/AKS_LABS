@@ -150,8 +150,42 @@ Meet developers where they are and provide the right information so the platform
 3. Crossplane creates another  Argo application Configuration and deploys it to the shared AKS app cluster (downstream cluster)
 4. This App configuration connects to the develper repository , downloads and installs the configuration
 
-## How the Microsoft Platform Engineering Journey Informs Our Direction
+## Enabling Self-Service Through Automation
 
-## Enabling Self-Service Through Automation (Demo)
+Self-service through automation is a key aspect of an engineering platform.
+
+### Platform Layers
+
+- **Top layer**
+  - Developer identity
+  - Orchestration and automation
+  - Platform and API catalog
+  - Team insights
+- **Foundation**
+  - Application templates (automation templates)
+  - Application platform (opinionated stacks), meaning the platform you actually run on (for example, Kubernetes)
+  - Engineering systems that reduce friction (for example, GitHub Actions)
+
+### Azure Deployment Environments
+
+- Self-service infrastructure as code
+- Typical use case: a Kubernetes environment where developers are given isolated namespaces
+
+### Example Flow
+
+- Background:
+  - The platform engineering team has already created the paved path (shared cluster)
+- Developer journey:
+  - A developer provisions the infrastructure they need
+  - The developer then uses AZD (Azure Developer CLI) to deploy code
+  - `azd env list` can be used to view available environments
+  - `azd deploy` deploys resources to the AKS cluster in an isolated namespace that reflects resources in the Azure deployment environment
 
 ## Copilot Extensibility and Platform Engineering
+
+- How we can take Copilot and apply it to platform engineering
+- Use AI to create an Azure deployment environment with the required resources
+- Deployment environments can work across tenants
+- Enables creation of isolated environments
+- Take the tools already used in your environment, make them easy to integrate and extend, and surface them through the tools developers already use, including Copilot
+- Simplify what developers need to do through platform engineering and increase developer joy and satisfaction
