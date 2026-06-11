@@ -52,8 +52,8 @@ resource "azurerm_linux_virtual_machine" "vm-linux-jumpbox" {
 
   source_image_reference {
     publisher = "canonical"
-    offer     = "ubuntu-2404" # "0001-com-ubuntu-server-jammy"
-    sku       = "minimal"      # "22_04-lts-gen2"
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts-gen2"
     version   = "latest"
   }
 
