@@ -103,3 +103,4 @@ terraform.rc
 AKS_agent/VBD_Agentic_AKS_Operations.md
 MicroservicesLab/
 AKS_KAITO/vbdexample.md
+.envrc

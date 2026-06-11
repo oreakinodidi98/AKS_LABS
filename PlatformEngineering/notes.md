@@ -938,6 +938,129 @@ Important scope note:
 - The sample resources (Resource Group, AKS cluster, Argo app, and starter workload) do not represent a complete developer solution.
 - Real platform offerings usually add many more resources, dependencies, policies, and abstractions so developers can provide only a few inputs and get started quickly.
 
-Cleanup:
+## Stage 10: Deploy Preconfigured, Standardized Solutions in Azure (Part 2)
 
-- When you are finished with this demo, remove the contents of `myfirstcluster.yaml` and commit the change to the main branch.
+In this stage, I stop deploying each resource manually and start exposing a standard platform request that teams can use.
+
+### What This Stage Does
+
+1. Defines a custom API for a standardized AKS deployment.
+2. Connects that API to a Composition that creates all required resources.
+3. Lets a team deploy the full setup by submitting one claim.
+4. Validates that all generated resources reconcile successfully.
+
+### Key Concepts in Plain Terms
+
+1. `XRD` defines the API shape and allowed fields.
+2. `Composition` defines what infrastructure and Kubernetes objects are created.
+3. `XR` is the generated composite resource instance.
+4. `Claim (XC)` is the user-facing request submitted in a namespace.
+5. `Patches` map claim input values into child resources.
+
+### Step 1: Create the XRD
+
+I create the XRD so platform users can request a staging AKS environment through a controlled schema.
+
+- File: `mgmtCluster/bootstrap/control-plane/xp-staging-cluster-definitions.yaml`
+- Required fields: `location`, `clustername`, `teamname`
+- Optional fields: `repourl`, `repopath`
+
+Validate it:
+
+```bash
+kubectl get compositeresourcedefinitions
+kubectl describe compositeresourcedefinition staging-aks.compute.example.com
+```
+
+### Step 2: Create the Composition
+
+I create the Composition that implements the actual resources behind the API.
+
+- File: `mgmtCluster/bootstrap/control-plane/xp-staging-cluster-comp.yaml`
+- Typical composed resources:
+  - ResourceGroup
+  - KubernetesCluster
+  - Helm ProviderConfig
+  - Argo Helm Release
+  - Kubernetes ProviderConfig
+  - Argo Application Object
+
+Important implementation note:
+
+- For composed `ProviderConfig` resources, set `readinessChecks` to `None`.
+
+### Step 3: Submit a Claim
+
+I submit one claim with only the platform-approved inputs.
+
+```bash
+name=my56app
+clustername=my56cluster
+teamname=team01
+repourl="https://github.com/danielsollondon/teaminfra/"
+repopath="infra/shared/k8s-cluster-config/sh01-wus2-01"
+
+cat <<EOF | kubectl apply -f -
+apiVersion: compute.example.com/v1alpha1
+kind: staging-aks
+metadata:
+  name: $name
+spec:
+  clustername: $clustername
+  teamname: $teamname
+  location: EU
+  repourl: $repourl
+  repopath: $repopath
+EOF
+```
+
+### Step 4: Validate Progress and Health
+
+I check the claim first:
+
+```bash
+kubectl describe staging-aks.compute.example.com/$name
+```
+
+Then I check all managed resources:
+
+```bash
+kubectl get managed
+```
+
+If there is an issue, I inspect the specific resource:
+
+```bash
+kubectl describe kubernetescluster.containerservice.azure.upbound.io/<cluster-name>
+```
+
+What I look for:
+
+1. Claim events such as `SelectComposition` and `ComposeResources`.
+2. `SYNCED` and `READY` states on managed resources.
+3. Provider error messages in `Status.Conditions` and `Events`.
+
+### Recap
+
+At this point, I have a standardized cluster request flow:
+
+1. Teams submit a simple claim.
+2. Crossplane enforces platform standards through XRD + Composition.
+3. The underlying complexity stays centralized in platform definitions.
+4. Everything is still tracked and auditable through Git and Kubernetes state.
+
+This is a baseline platform pattern. A full production solution will include additional policies, dependencies, and app-environment components.
+
+### Keep or Clean Up
+
+- Keep the cluster running for the next stage.
+- If needed, delete the claim and composed resources:
+
+```bash
+kubectl delete staging-aks.compute.example.com/my56app
+```
+
+## Links
+
+[Crossplane](https://www.crossplane.io/?_gl=1*1dro6di*_ga*MTY2NDM4MzI0Ni4xNzgxMTY2MzY1*_ga_SFCPQYSLHY*czE3ODExNjYzNjUkbzEkZzAkdDE3ODExNjYzNjUkajYwJGwwJGgw)
+[ArgoCD](https://argo-cd.readthedocs.io/en/stable/getting_started/)
