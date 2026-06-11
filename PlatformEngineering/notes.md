@@ -973,127 +973,503 @@ Important scope note:
 - The sample resources (Resource Group, AKS cluster, Argo app, and starter workload) do not represent a complete developer solution.
 - Real platform offerings usually add many more resources, dependencies, policies, and abstractions so developers can provide only a few inputs and get started quickly.
 
-## Stage 10: Deploy Preconfigured, Standardized Solutions in Azure (Part 2)
+## Stage 10: Deploy Preconfigured, Standardized Solutions in Azure (Demo 2)
 
 In this stage, I stop deploying each resource manually and start exposing a standard platform request that teams can use.
 
 ### What This Stage Does
 
-1. Defines a custom API for a standardized AKS deployment.
-2. Connects that API to a Composition that creates all required resources.
-3. Lets a team deploy the full setup by submitting one claim.
-4. Validates that all generated resources reconcile successfully.
+1. Defines a custom API for a standardized AKS deployment using **XRD** (Composite Resource Definition)
+2. Connects that API to a **Composition** that creates all required resources
+3. Lets a team deploy the full setup by submitting one simple **claim**
+4. Validates that all generated resources reconcile successfully
 
 ### Key Concepts in Plain Terms
 
-1. `XRD` defines the API shape and allowed fields.
-2. `Composition` defines what infrastructure and Kubernetes objects are created.
-3. `XR` is the generated composite resource instance.
-4. `Claim (XC)` is the user-facing request submitted in a namespace.
-5. `Patches` map claim input values into child resources.
+Before diving in, here's what each concept does:
 
-### Step 1: Create the XRD
+1. **XRD** — Defines the API shape and allowed fields that teams can request
+2. **Composition** — Defines what infrastructure and Kubernetes objects get created behind the scenes
+3. **XR (Composite Resource)** — The generated composite resource instance created by Crossplane
+4. **Claim (XC)** — The user-facing request submitted in a namespace (what teams actually submit)
+5. **Patches** — Map claim input values into child resources (enforce standards and enable string concatenation)
+6. **Pipeline Mode** — Crossplane v1.13+ feature that uses functions to provision resources
 
-I create the XRD so platform users can request a staging AKS environment through a controlled schema.
+### Overview
 
-- File: `mgmtCluster/bootstrap/control-plane/xp-staging-cluster-definitions.yaml`
-- Required fields: `location`, `clustername`, `teamname`
-- Optional fields: `repourl`, `repopath`
+This guide walks through setting up a **cloud-native self-service platform** using:
+- **Crossplane**: Cloud-native infrastructure provisioning via Pipeline mode
+- **ArgoCD**: GitOps-based configuration management  
+- **Kubernetes**: Management cluster (hosts Crossplane & Argo) and downstream application clusters
 
-Validate it:
+**Result**: One simple claim provisions a complete AKS cluster with ArgoCD pre-installed, ready to deploy applications.
+
+---
+
+### Prerequisites
+
+✅ **Management Cluster Ready**
+- `mgmt-aks` running with Crossplane v1.13+ installed
+- Helm and Kubernetes providers installed
+- Default ProviderConfig configured for Azure
+
+✅ **Providers Installed**
+```bash
+kubectl get providers.pkg.crossplane.io
+# Should show: provider-azure-management, provider-azure-containerservice, 
+#              provider-helm, provider-kubernetes
+```
+
+✅ **Function Installed**
+```bash
+kubectl get functions.pkg.crossplane.io function-patch-and-transform
+# Should show: HEALTHY=True
+```
+
+---
+
+### File Structure
+
+```
+mgmtCluster/bootstrap/control-plane/compositions/
+├── staging-cluster-definitions.yaml       ✅ XRD (defines the API)
+├── function-patch-and-transform.yaml       ✅ Function (enables provisioning)
+└── staging-cluster-comp-final.yaml         ✅ Composition (implements resources)
+
+downstreamInfra/team01/
+├── team1-apps.yaml                         ✅ Claim (user request)
+└── workloads/ (future: app manifests)
+
+.envrc                                       ✅ Environment variables
+```
+
+---
+
+### Step-by-Step Deployment
+
+#### Step 1: Install Function
+
+The composition function handles resource provisioning in Pipeline mode.
 
 ```bash
+kubectl apply -f .\mgmtCluster\bootstrap\control-plane\compositions\function-patch-and-transform.yaml
+
+# Wait for it to become healthy
+kubectl get functions.pkg.crossplane.io function-patch-and-transform -w
+```
+
+**Status**: Wait until `HEALTHY=True` before proceeding.
+
+#### Step 2: Apply XRD (API Definition)
+
+The XRD defines the interface teams use to request clusters. It's the schema—what parameters are allowed, which are required, and what types they must be.
+
+```bash
+kubectl apply -f .\mgmtCluster\bootstrap\control-plane\compositions\staging-cluster-definitions.yaml
+
+# Verify the XRD was applied
 kubectl get compositeresourcedefinitions
 kubectl describe compositeresourcedefinition staging-aks.compute.example.com
 ```
 
-### Step 2: Create the Composition
+**What This Does**: 
 
-I create the Composition that implements the actual resources behind the API.
+The XRD validates that all claims include the required fields and optional fields:
+- **Required fields**: `location`, `clustername`, `teamname`
+- **Optional fields**: `repourl`, `repopath`
 
-- File: `mgmtCluster/bootstrap/control-plane/xp-staging-cluster-comp.yaml`
-- Typical composed resources:
-  - ResourceGroup
-  - KubernetesCluster
-  - Helm ProviderConfig
-  - Argo Helm Release
-  - Kubernetes ProviderConfig
-  - Argo Application Object
+**Practical Use Case**:
 
-Important implementation note:
+An organization with an approved AKS cluster configuration that every team must follow uses the XRD to enforce consistency. The XRD accepts the approved inputs (clustername, location, teamname), and the Composition uses those values to create the AKS cluster and resource group in a controlled, standardized way. This ensures no team can deviate from the platform's standards.
 
-- For composed `ProviderConfig` resources, set `readinessChecks` to `None`.
+**Why Patches Matter**:
 
-### Step 3: Submit a Claim
+One key thing to notice here is how Crossplane **patches** are used to set values in the composed resources. Values from the XR claim flow into the managed resources, so the platform can enforce approved settings like `clustername` instead of letting teams change them freely. 
 
-I submit one claim with only the platform-approved inputs.
+For example:
+- `clustername: my56cluster` → becomes the actual AKS cluster name
+- `location: EU` → gets transformed to the Azure region name `Sweden Central`
+- Patches can also concatenate values for secret names, provider configuration names, and other derived values
+
+This allows:
+- ✅ Teams provide simple inputs
+- ✅ Platform enforces standards and naming conventions
+- ✅ No duplicate or conflicting configurations
+- ✅ Automatic value transformation (human-friendly to Azure format)
+
+#### Step 3: Apply Composition
+
+The Composition is the implementation layer. It takes the XRD schema and implements the actual resource provisioning logic using **Pipeline mode**.
 
 ```bash
-name=my56app
-clustername=my56cluster
-teamname=team01
-repourl="https://github.com/danielsollondon/teaminfra/"
-repopath="infra/shared/k8s-cluster-config/sh01-wus2-01"
+kubectl apply -f .\mgmtCluster\bootstrap\control-plane\compositions\staging-cluster-comp-final.yaml
 
-cat <<EOF | kubectl apply -f -
+# Verify the composition was applied
+kubectl get composition staging-aks
+```
+
+**What It Does**: 
+
+When a claim is submitted, Crossplane uses the Composition to automatically create these 6 resources in sequence:
+1. **ResourceGroup** in Azure (resource container)
+2. **KubernetesCluster** (AKS) in Azure (the actual cluster)
+3. **Helm ProviderConfig** (Crossplane authentication to the new cluster)
+4. **Argo Helm Release** (installs ArgoCD on the new cluster)
+5. **Kubernetes ProviderConfig** (Crossplane Kubernetes authentication)
+6. **Argo Application** (configures ArgoCD to watch Git for workloads)
+
+The dependencies are handled automatically: ArgoCD Release waits for the cluster to be Ready before installing, and the Application resource waits for the Helm release to be Ready before syncing workloads.
+
+**Key Implementation Notes for Pipeline Mode:**
+
+Pipeline mode (Crossplane v1.13+) uses **functions** to transform and provision resources. This is how it works:
+
+1. **API Structure**: The composition uses `mode: Pipeline` with a `pipeline` array containing function steps
+2. **Function Input**: Resources are provided as input to the `function-patch-and-transform` function under `input.resources:` 
+3. **Patch Transformations**: Use `transforms` with `type: map` to translate human-friendly values (e.g., `EU`) into Azure region names (`Sweden Central`)
+
+4. **ProviderConfig readinessChecks — IMPORTANT**:
+   - Set to `- type: None` because ProviderConfigs do not become Ready in the normal sense
+   - The `secretRef` points to the secret containing the downstream AKS kubeconfig for authentication
+   - Crossplane uses that secret to authenticate with the newly provisioned downstream cluster
+   - If you leave readiness checks enabled, Crossplane can wait forever or report the resource as not ready even when the configuration is correct
+   - Suppressing these checks prevents false "not ready" warnings while the resources function correctly
+
+#### Step 4: Submit a Claim
+
+Teams submit a simple request to provision a cluster. This is the **only thing a team needs to do** to get a complete, production-ready cluster.
+
+```bash
+kubectl apply -f .\downstreamInfra\team01\team1-apps.yaml
+```
+
+Or manually submit a claim YAML:
+
+```yaml
 apiVersion: compute.example.com/v1alpha1
 kind: staging-aks
 metadata:
-  name: $name
+  name: my56app
 spec:
-  clustername: $clustername
-  teamname: $teamname
+  clustername: my56cluster
+  teamname: team01
   location: EU
-  repourl: $repourl
-  repopath: $repopath
-EOF
+  repourl: https://github.com/oreakinodidi98/PlatformEngineeringDemo
+  repopath: workloads/team01
 ```
 
-### Step 4: Validate Progress and Health
+**What This Triggers**: 
 
-I check the claim first:
+Behind the scenes:
+1. Crossplane validates inputs against the XRD schema
+2. Selects the `staging-aks` Composition
+3. Runs the Pipeline mode function with the claim values
+4. Provisions all 6 resources in dependency order
+
+**Provisioning Sequence** (automatic):
+
+| Step | Resource | Time | Status |
+|------|----------|------|--------|
+| 1 | ResourceGroup created | ~10s | READY=True |
+| 2 | KubernetesCluster provisioning starts | 5-15m | READY=False (in progress) |
+| 3 | ProviderConfigs created | Immediate | (no READY status expected) |
+| 4 | Waiting for cluster | 5-15m | Helm Release SYNCED=False (waiting) |
+| 5 | Cluster ready | 10-15m | READY=True |
+| 6 | ArgoCD installing | 2-5m | Release READY=True |
+| 7 | Argo Application syncing | 1-2m | Application READY=True |
+
+---
+
+### Validating Provisioning Progress
+
+After submitting the claim, Crossplane begins provisioning all resources. Here's how to monitor the process and understand what you're seeing.
+
+#### Watch the Claim Status
 
 ```bash
-kubectl describe staging-aks.compute.example.com/$name
+kubectl describe staging-aks.compute.example.com/my56app
 ```
 
-Then I check all managed resources:
+You'll see events and status conditions that tell you the provisioning progress:
+- `Synced: False` → Initial state, configuration being applied
+- `Synced: True` → Configuration applied successfully
+- `Ready: False (Creating)` → Resources being provisioned
+- `Ready: True` → All resources ready
+
+#### Monitor Real-Time Claim Changes
 
 ```bash
-kubectl get managed
+kubectl get staging-aks.compute.example.com/my56app -w
 ```
 
-If there is an issue, I inspect the specific resource:
-
-```bash
-kubectl describe kubernetescluster.containerservice.azure.upbound.io/<cluster-name>
+Status progression:
+```
+Synced: False (initial)  →  Synced: True (resources created)
+Ready: False (Creating)  →  Ready: True  (all ready)
 ```
 
-What I look for:
+#### Watch the Cluster Being Created in Azure
 
-1. Claim events such as `SelectComposition` and `ComposeResources`.
-2. `SYNCED` and `READY` states on managed resources.
-3. Provider error messages in `Status.Conditions` and `Events`.
-
-### Recap
-
-At this point, I have a standardized cluster request flow:
-
-1. Teams submit a simple claim.
-2. Crossplane enforces platform standards through XRD + Composition.
-3. The underlying complexity stays centralized in platform definitions.
-4. Everything is still tracked and auditable through Git and Kubernetes state.
-
-This is a baseline platform pattern. A full production solution will include additional policies, dependencies, and app-environment components.
-
-### Keep or Clean Up
-
-- Keep the cluster running for the next stage.
-- If needed, delete the claim and composed resources:
+The KubernetesCluster resource shows the most detailed provisioning information:
 
 ```bash
+kubectl get kubernetescluster.containerservice.azure.upbound.io/my56cluster -w
+```
+
+Status progression (this takes the longest):
+```
+SYNCED=True, READY=False  (provisioning in Azure - 5-15 min - this is normal!)
+   ↓
+SYNCED=True, READY=True   (cluster ready, ArgoCD now installing)
+```
+
+For detailed information, inspect the resource:
+
+```bash
+kubectl describe kubernetescluster.containerservice.azure.upbound.io/my56cluster
+```
+
+Look for:
+- `.status.conditions[].reason` and `.status.conditions[].message` for error details
+- `.status.atProvider` for Azure resource details (region, version, node pool state)
+- Events section for reconciliation history
+
+#### View All Provisioned Resources
+
+```bash
+kubectl get managed -o wide
+```
+
+Expected output during provisioning:
+```
+NAME                                                    SYNCED    READY    AGE
+resourcegroup.azure.upbound.io/my56app-xxxxx           True      True     1m
+kubernetescluster.containerservice.azure.upbound.io/my56cluster  True  False  5m
+providerconfig.helm.crossplane.io/my56app-xxxxx         True      -       3m
+providerconfig.kubernetes.crossplane.io/my56app-xxxxx   True      -       3m
+release.helm.crossplane.io/my56app-xxxxx               False     -       2m
+object.kubernetes.crossplane.io/my56app-xxxxx          False     -       2m
+```
+
+**What each status means**:
+- ProviderConfigs: Don't show READY status (expected with `readinessChecks: - type: None`)
+- Release/Object: Show `SYNCED=False` while waiting for cluster to be Ready (they depend on it)
+
+---
+
+### Monitoring Provisioning
+
+#### Watch the Claim
+
+```bash
+kubectl get staging-aks.compute.example.com/my56app -w
+```
+
+Status progression:
+```
+Synced: False (initial)  →  Synced: True (resources created)
+Ready: False (Creating)  →  Ready: True  (all ready)
+```
+
+#### Watch the Cluster
+
+```bash
+kubectl get kubernetescluster.containerservice.azure.upbound.io/my56cluster -w
+```
+
+Status progression:
+```
+SYNCED=True, READY=False  (provisioning in Azure - 5-15 min)
+   ↓
+SYNCED=True, READY=True   (cluster ready, ArgoCD installing)
+```
+
+#### View All Resources
+
+```bash
+kubectl get managed -o wide
+```
+
+Expected output:
+```
+NAME                                                    SYNCED    READY    AGE
+resourcegroup.azure.upbound.io/my56app-xxxxx           True      True     1m
+kubernetescluster.containerservice.azure.upbound.io/my56cluster  True  False  5m
+release.helm.crossplane.io/my56app-xxxxx               False            2m
+object.kubernetes.crossplane.io/my56app-xxxxx          False            2m
+```
+
+---
+
+### Expected Timeline
+
+| Phase | Duration | What Happens |
+|-------|----------|-------------|
+| **Claim Submitted** | 0s | Claim validated, composition selected, pipeline starts |
+| **ResourceGroup Created** | ~10s | Azure resource group ready |
+| **AKS Provisioning Begins** | Immediate | Crossplane sends cluster creation request to Azure |
+| **AKS Cluster Provisioning** | 5-15m | ⏳ Azure creates cluster, installs add-ons, scales node pools |
+| **Cluster Ready in Azure** | 10-15m | KubernetesCluster resource shows READY=True |
+| **ProviderConfigs Created** | Immediate | Crossplane configures Helm and Kubernetes authentication |
+| **ArgoCD Installation** | 2-5m | Helm release deploys ArgoCD to the new cluster |
+| **Application Sync Begins** | 1-2m | Argo Application starts watching Git repository |
+| **✅ Complete** | **15-25 min** | Cluster ready, ArgoCD installed, applications deploying |
+
+**Note**: The longest phase is AKS cluster provisioning (5-15 minutes). This is normal and happens in Azure. During this time, the KubernetesCluster resource will show `SYNCED=True, READY=False`.
+
+---
+
+### Understanding the Architecture
+
+#### Single Repo, Two Zones Pattern
+
+This design keeps infrastructure requests and application workloads organized:
+
+**Management Cluster Zone** (`mgmtCluster/bootstrap/`)
+- Hosts Crossplane (infrastructure provisioning engine)
+- Hosts ArgoCD (GitOps orchestration engine)
+- Contains definitions (XRD, Composition, Functions)
+- **Role**: Control plane for infrastructure — the "brain" of your platform
+
+**Workload Zone** (`downstreamInfra/`)
+- Contains infrastructure claims (staging-aks requests)
+- Contains workload manifests (application configurations)
+- **Role**: User-facing place to request infrastructure and deploy apps
+
+**End-to-End Flow**:
+1. Team writes a claim in `downstreamInfra/team01/team1-apps.yaml`
+2. Claim reaches management cluster via GitOps sync or `kubectl apply`
+3. Crossplane detects the new claim, validates it, and starts provisioning
+4. AKS cluster is created in Azure
+5. Kubeconfig secret is automatically written to the management cluster
+6. Crossplane installs ArgoCD on the new cluster using the secret
+7. ArgoCD Application is created pointing to `workloads/team01/` in Git
+8. ArgoCD watches the Git repository and automatically deploys all workload manifests
+9. Team's applications are now running on the new cluster
+
+#### How Patches Customize Resources
+
+The Composition uses **patches** to customize resources from claim values:
+
+Example transformations:
+- Claim input `location: EU` → Composition transforms to Azure region `Sweden Central`
+- Claim input `clustername: my56cluster` → becomes AKS cluster name `my56cluster`
+- Patches concatenate values for derived names: secret names, provider names, etc.
+
+This allows:
+- ✅ Teams provide only simple inputs
+- ✅ Platform automatically enforces standards
+- ✅ No duplicate or conflicting configurations
+- ✅ Automatic value transformation (human-friendly to Azure format)
+- ✅ Centralized control of naming and resource conventions
+
+---
+
+### Troubleshooting
+
+#### Claim stuck in `Ready=False (Creating)`
+
+**Cause**: AKS cluster still provisioning (normal for first 10-15 minutes)
+
+**Solution**: Wait and monitor
+```bash
+kubectl describe kubernetescluster.containerservice.azure.upbound.io/my56cluster
+```
+
+#### Release/Object showing `SYNCED=False`
+
+**Cause**: Waiting for KubernetesCluster to be `READY=True`
+
+**Solution**: This is expected. Once cluster is ready, these will automatically sync.
+
+#### "ProviderConfig not Ready" warning
+
+**Cause**: ProviderConfigs don't follow standard Ready logic
+
+**Solution**: This is expected. We set `readinessChecks: - type: None` to suppress false warnings. They work correctly even though they don't show as Ready.
+
+#### Schema validation error on composition
+
+**Cause**: Crossplane version mismatch
+
+**Solution**: Ensure Crossplane v1.13+
+```bash
+kubectl get deployment crossplane -n crossplane-system -o jsonpath='{.spec.template.spec.containers[0].image}'
+```
+
+---
+
+### Cleanup
+
+Delete the provisioned infrastructure:
+
+```bash
+# Delete the claim - cascades to all composed resources
 kubectl delete staging-aks.compute.example.com/my56app
+
+# Verify deletion (AKS deletion takes 5-10 minutes in Azure)
+kubectl get managed -w
 ```
+
+This removes:
+- ✓ Azure ResourceGroup
+- ✓ AKS Cluster
+- ✓ ProviderConfigs
+- ✓ ArgoCD Release
+- ✓ Argo Application
+
+---
+
+### Next Steps
+
+**Extend the Platform**:
+1. Add more providers (databases, storage, networking)
+2. Add Gatekeeper policies for resource governance
+3. Add team RBAC for namespace isolation
+4. Add pre-defined workload templates in the catalog
+5. Connect to Backstage for developer portal
+
+**Automate Claims**:
+1. Create CI/CD pipeline to generate claims from templates
+2. Add approval workflows before claim submission
+3. Add cost estimation and quota validation
+
+---
+
+### Key Files Reference
+
+| File | Purpose | Type |
+|------|---------|------|
+| `staging-cluster-definitions.yaml` | API schema | XRD |
+| `function-patch-and-transform.yaml` | Resource provisioning engine | Function |
+| `staging-cluster-comp-final.yaml` | Provisioning logic | Composition |
+| `team1-apps.yaml` | Infrastructure request | Claim |
+| `notes.md` | Full walkthrough | Documentation |
+
+---
+
+### Important Constraints & Notes
+
+⚠️ **Crossplane Version**: v1.13+ required (Pipeline mode)
+
+⚠️ **ProviderConfig readinessChecks**: Must be `- type: None` (they don't become Ready normally)
+
+⚠️ **Kubeconfig Secret**: Created automatically in `crossplane-system` namespace when AKS cluster is provisioned
+
+⚠️ **Azure Credentials**: Management cluster must have Azure permissions via identity or service principal
+
+⚠️ **Cluster Provisioning Time**: AKS clusters take 5-15 minutes to provision in Azure (not instant)
+
+---
+
+### Recap: Standardized Cluster Request Flow
+
+1. **Teams submit a simple claim** - Just 5 parameters (clustername, teamname, location, repo, path)
+2. **Crossplane enforces standards** - XRD validates inputs, Composition enforces approved configuration
+3. **All complexity centralized** - Platform team controls resource creation in one place
+4. **Fully auditable** - All resources tracked in Kubernetes, Git history preserved, easy to replicate
+
+This is a **baseline platform pattern**. A full production solution will include additional policies, dependencies, and app-environment components.
 
 ## Links
 
