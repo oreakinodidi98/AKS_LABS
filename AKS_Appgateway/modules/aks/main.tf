@@ -27,6 +27,11 @@ resource "azurerm_application_gateway" "appgateway" {
     capacity = 1
   }
 
+  ssl_policy {
+    policy_type = "Predefined"
+    policy_name = "AppGwSslPolicy20220101"
+  }
+
   frontend_ip_configuration {
     name                 = local.frontend_ip_configuration_name
     public_ip_address_id = azurerm_public_ip.pip-appgateway.id
@@ -150,7 +155,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     #vnet_subnet_id = var.aks_subnet_id 
     node_labels         = {
       "nodepool" = "systempool"
-      "env"      = "AKS Mod"
+      "env"      = "aks-mod"
     }
   }
   identity {

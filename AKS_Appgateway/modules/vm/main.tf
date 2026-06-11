@@ -26,6 +26,7 @@ resource "azurerm_network_interface" "nic-vm-linux" {
 
 resource "azurerm_linux_virtual_machine" "vm-linux-jumpbox" {
   name                            = var.vm_name
+  computer_name                   = substr(replace(var.vm_name, "_", "-"), 0, 64)
   resource_group_name             = var.resourcegroup
   location                        = var.location
   size                            = "Standard_D2ads_v6"
@@ -44,8 +45,8 @@ resource "azurerm_linux_virtual_machine" "vm-linux-jumpbox" {
     disk_size_gb         = 64
 
     diff_disk_settings {
-      option    = "Local"    # Specifies the Ephemeral Disk Settings for the OS Disk. At this time the only possible value is Local.
-      placement = "NvmeDisk" # "ResourceDisk" # "CacheDisk" # Specifies the Ephemeral Disk Placement for the OS Disk. NvmeDisk can only be used for v6 VMs
+      option    = "Local"        # Specifies the Ephemeral Disk Settings for the OS Disk. At this time the only possible value is Local.
+      placement = "ResourceDisk" # "CacheDisk" # Specifies the Ephemeral Disk Placement for the OS Disk. ResourceDisk is used for v6 VMs with Ephemeral OS
     }
   }
 

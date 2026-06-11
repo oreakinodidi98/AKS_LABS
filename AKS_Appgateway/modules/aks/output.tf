@@ -69,11 +69,6 @@ output "pip_app_gateway" {
   value = azurerm_public_ip.pip-appgateway.ip_address
 }
 
-output "aks_oidc_issuer_url" {
-  value       = azurerm_kubernetes_cluster.aks_cluster.oidc_issuer_enabled ? azurerm_kubernetes_cluster.aks_cluster.oidc_issuer[0].issuer_url : null
-  description = "OIDC issuer URL for workload identity"
-}
-
 output "aks_kubelet_identity_id" {
   value       = azurerm_kubernetes_cluster.aks_cluster.kubelet_identity[0].object_id
   description = "Kubelet managed identity for AKS operations"

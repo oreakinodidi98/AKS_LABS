@@ -35,37 +35,37 @@ module "monitoring" {
 }
 
 module "aks" {
-  source            = "./modules/aks"
-  resourcegroup     = azurerm_resource_group.resourcegroup.name
-  location          = var.location
-  aks_cluster_name  = var.aks_cluster_name
-  acr_name          = var.acr_name
-  system_node_count = var.system_node_count
-  log_analytics_id  = module.monitoring.azurerm_log_analytics_workspace_id
-  resourcegroup_id  = azurerm_resource_group.resourcegroup.id
-  identity_prefix   = var.identity_prefix
-  ssh_public_key    = var.ssh_public_key
-  aks_subnet_id     = module.network.aks_subnet_id
+  source               = "./modules/aks"
+  resourcegroup        = azurerm_resource_group.resourcegroup.name
+  location             = var.location
+  aks_cluster_name     = var.aks_cluster_name
+  acr_name             = var.acr_name
+  system_node_count    = var.system_node_count
+  log_analytics_id     = module.monitoring.azurerm_log_analytics_workspace_id
+  resourcegroup_id     = azurerm_resource_group.resourcegroup.id
+  identity_prefix      = var.identity_prefix
+  ssh_public_key       = var.ssh_public_key
+  aks_subnet_id        = module.network.aks_subnet_id
   appgateway_subnet_id = module.network.app_gateway_subnet_id
-  pip_name         = var.pip_name
-  appgateway_name  = var.appgateway_name
-  depends_on = [module.monitoring, module.network]
+  pip_name             = var.pip_name
+  appgateway_name      = var.appgateway_name
+  depends_on           = [module.monitoring, module.network]
 }
 
 # vnet and subnet
 module "network" {
-  source                      = "./modules/vnet"
-  location                    = var.location
-  resourcegroup               = azurerm_resource_group.resourcegroup.name
-  vnet_name                   = "${var.resourcegroup}-vnet-spoke"
+  source        = "./modules/vnet"
+  location      = var.location
+  resourcegroup = azurerm_resource_group.resourcegroup.name
+  vnet_name     = "${var.resourcegroup}-vnet-spoke"
 }
 
 # vm
 module "VM" {
-  source                      = "./modules/vm"
-  location                    = var.location
-  resourcegroup               = azurerm_resource_group.resourcegroup.name
-  vm_name                   = "${var.resourcegroup}-vm-linux-jumpbox"
-  nic_name                   = "${var.resourcegroup}-nic-vm-linux"
-  vm_subnet_id             = module.network.vm_subnet_id
+  source        = "./modules/vm"
+  location      = var.location
+  resourcegroup = azurerm_resource_group.resourcegroup.name
+  vm_name       = "${var.resourcegroup}-vm-linux-jumpbox"
+  nic_name      = "${var.resourcegroup}-nic-vm-linux"
+  vm_subnet_id  = module.network.vm_subnet_id
 }
