@@ -877,6 +877,41 @@ Go to the Argo CD UI on your management cluster and sync the `downstream-infra` 
 3. Click **Sync** to trigger reconciliation
 
 Argo CD will then deploy the workload manifests to the downstream cluster.
+### Test
+
+In a new terminal, get credentials for the downstream cluster:
+
+```powershell
+az aks get-credentials `
+  --resource-group rg-myfirst `
+  --name test-clu1 `
+  --overwrite-existing
+```
+
+Check the Helm release status:
+
+```powershell
+kubectl -n argocd describe release.helm.crossplane.io clu1-argo
+```
+
+Watch the Argo CD Object resource:
+
+```powershell
+kubectl -n argocd get object.kubernetes.crossplane.io core-cluster-configs -w
+```
+
+Trigger immediate reconciliation of the Helm release:
+
+```powershell
+kubectl -n argocd annotate release.helm.crossplane.io clu1-argo crossplane.io/reconcile=now --overwrite
+```
+
+Trigger immediate reconciliation of the Kubernetes Object:
+
+```powershell
+kubectl -n argocd annotate object.kubernetes.crossplane.io core-cluster-configs crossplane.io/reconcile=now --overwrite
+```
+
 
 ### Validate API Access to the Downstream Cluster
 

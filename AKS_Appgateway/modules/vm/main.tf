@@ -36,18 +36,12 @@ resource "azurerm_linux_virtual_machine" "vm-linux-jumpbox" {
   network_interface_ids           = [azurerm_network_interface.nic-vm-linux.id]
   priority                        = "Spot"
   eviction_policy                 = "Delete"
-  disk_controller_type            = "NVMe" # "SCSI" # "IDE" # "SCSI" is the default value. "NVMe" is only supported for Ephemeral OS Disk.
 
   os_disk {
     name                 = "os-disk-vm-linux"
     caching              = "ReadOnly"        # "ReadWrite" # None, ReadOnly and ReadWrite.
     storage_account_type = "StandardSSD_LRS" # "Standard_LRS"
     disk_size_gb         = 64
-
-    diff_disk_settings {
-      option    = "Local"        # Specifies the Ephemeral Disk Settings for the OS Disk. At this time the only possible value is Local.
-      placement = "ResourceDisk" # "CacheDisk" # Specifies the Ephemeral Disk Placement for the OS Disk. ResourceDisk is used for v6 VMs with Ephemeral OS
-    }
   }
 
   source_image_reference {
