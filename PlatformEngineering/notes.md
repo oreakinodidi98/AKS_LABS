@@ -572,6 +572,8 @@ In your private GitHub repo, create the file:
 
 - `mgmtCluster/bootstrap/control-plane/downstreamInfraApp.yaml`
 
+This file defines **two** ArgoCD Applications — one for the test cluster infra, and one for each team's claims folder:
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -588,6 +590,29 @@ spec:
     path: downstreamInfra/testcluster/
   syncPolicy:
     automated: {}
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+  destination:
+    namespace: argocd
+    server: https://kubernetes.default.svc
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: team01-claims
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/<GITHUB_USER>/<GITHUB_REPO>
+    targetRevision: HEAD
+    path: downstreamInfra/team01/
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
   destination:
     namespace: argocd
     server: https://kubernetes.default.svc
@@ -597,6 +622,9 @@ Notes:
 
 - The finalizer ensures child applications and their resources are deleted when the parent application is deleted.
 - Replace `<GITHUB_USER>` and `<GITHUB_REPO>` with your actual values.
+- `downstream-infra` watches `downstreamInfra/testcluster/` (manual cluster resources).
+- `team01-claims` watches `downstreamInfra/team01/` so that any claim YAML a team pushes there is automatically applied to the management cluster — this is what makes the self-service GitOps flow work. Without it, claims must be applied manually with `kubectl apply`.
+- Add a new `teamXX-claims` application for each additional team.
 
 ### 8. Add Downstream Infrastructure Resource YAML
 
@@ -1135,7 +1163,23 @@ Pipeline mode (Crossplane v1.13+) uses **functions** to transform and provision 
    - If you leave readiness checks enabled, Crossplane can wait forever or report the resource as not ready even when the configuration is correct
    - Suppressing these checks prevents false "not ready" warnings while the resources function correctly
 
-#### Step 4: Submit a Claim
+#### Step 4: Wire the Claims Folder into GitOps
+
+Before teams can submit claims via Git, you need an ArgoCD Application on the management cluster that watches their claims folder. Without this, claims must be applied manually.
+
+Add the `team01-claims` application to `mgmtCluster/bootstrap/control-plane/downstreamInfraApp.yaml` (alongside the existing `downstream-infra` application — see Step 7 above for the full YAML). Then apply it:
+
+```bash
+kubectl apply -f .\mgmtCluster\bootstrap\control-plane\downstreamInfraApp.yaml
+
+# Verify both applications exist
+kubectl get applications -n argocd
+# Expected: downstream-infra, team01-claims, crossplane-prov-config
+```
+
+Once `team01-claims` exists, any YAML pushed to `downstreamInfra/team01/` in Git is automatically applied to the management cluster. Teams never need `kubectl` access.
+
+#### Step 5: Submit a Claim
 
 Teams submit a simple request to provision a cluster. This is the **only thing a team needs to do** to get a complete, production-ready cluster.
 
@@ -1475,3 +1519,360 @@ This is a **baseline platform pattern**. A full production solution will include
 
 [Crossplane](https://www.crossplane.io/?_gl=1*1dro6di*_ga*MTY2NDM4MzI0Ni4xNzgxMTY2MzY1*_ga_SFCPQYSLHY*czE3ODExNjYzNjUkbzEkZzAkdDE3ODExNjYzNjUkajYwJGwwJGgw)
 [ArgoCD](https://argo-cd.readthedocs.io/en/stable/getting_started/)
+
+## Part 3: Deploy a Cloud Native App with a Full App Environment in Azure
+
+* Examples
+  * [Part 1: Create, Configure Mgmt Cluster, Repo, Tools and Deploy Infra](readme.md)
+  * [Part 2: Deploy Preconfigured, Standardized Solutions in Azure](readme2.md)
+  * Part 3: Deploy a Cloud Native App with a Full App Environment in Azure
+
+A cloud native app is made up of more than just a namespace and an Argo Application. In practice, you usually also need an identity, access to a secret store, a database, and observability.
+
+With that in mind, in this part of the demo we will use Crossplane to deploy an application to an existing AKS cluster:
+
+1. In this demo, we will create a project-specific resource group, deploy all required resources, set up identity permissions as in the previous steps, and store the CosmosDB connection string in Key Vault.
+2. Using Crossplane, we will then create another Argo app configuration on the shared app cluster (`my56cluster`). This uses an app-of-apps pattern (one Argo app manages another app configuration). That configuration connects to the developer app repo, which contains the templated Helm chart, and continuously reconciles the environment (keeps the cluster state aligned with what is in Git) by creating an isolated project namespace for the team and deploying a container with workload identity (the app uses an Azure-managed identity instead of hard-coded credentials), so it can connect to Azure Key Vault and retrieve the CosmosDB connection string.
+
+    > Note!
+      * In this example we won't create a CosmosDB instance to keep costs down, but you'll still see how the flow works. We'll simulate the pod retrieving the secret by manually creating it in K8s, then using Crossplane to create a secret from it.
+
+## Prerequisites
+1. You will need the cluster created in the previous step.
+2. You will also need these values ready, and you should update the configuration files with them where noted:
+  * Cluster name (the AKS cluster name), for example `my56cluster`
+  * Cluster resource group (the Azure resource group that contains the cluster), for example `my56app-kzzj2`
+  * Kubelet user-assigned identity resource ID (the full Azure resource ID for the identity you created earlier), for example:
+    * `/subscriptions/<subscriptionId>/resourceGroups/<mgmtClusterResGroup>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/kbl-infra002-uai`
+
+### Step 1 : Simulating a Cosmos DB connection string
+In this sample, we are not creating a Cosmos DB connection string directly. Instead, we assume you are using a [CosmosDB provider](https://marketplace.upbound.io/providers/upbound/provider-azure-cosmosdb/latest/resources/cosmosdb.azure.upbound.io/Account/v1beta1) (a Crossplane component that creates and manages Cosmos DB resources), and that it has already retrieved the connection string and written it to a Kubernetes secret.
+
+* Add the secret to the management cluster:
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-conn-string
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  db-conn-string: mongodb://mongo-app1-connection-string
+EOF
+```
+
+PowerShell alternative:
+
+```powershell
+@"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-conn-string
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  db-conn-string: mongodb://mongo-app1-connection-string
+"@ | kubectl apply -f -
+```
+
+### Step 2 : XRD
+* Use this file, which defines the XRD (the schema that controls what developers are allowed to provide): `C:\PlatformEngineeringDemo\mgmtCluster\bootstrap\control-plane\compositions\prod-cluster-definitions.yaml`
+As defined in that XRD, these are the properties developers can configure and only one that is required is the location:
+```yaml
+properties:
+  spec:
+    type: object
+    properties:
+      appname:
+        type: string
+      repourl:
+        type: string
+      repopath:
+        type: string
+      location:
+        type: string
+        oneOf:
+          - pattern: '^EU$'
+          - pattern: '^US$'
+    required:
+      - location
+```
+
+1. appname: the application name.
+2. repourl: the Git repository URL, for example 'https://github.com/oreakinodidi98/PlatformEngineeringDemo'.
+3. repopath: the path in that repository where the manifests live, for example 'workloads/team01/infra002'.
+
+Add the XRD to the cluster:
+```bash
+kubectl apply -f C:\PlatformEngineeringDemo\mgmtCluster\bootstrap\control-plane\compositions\prod-cluster-definitions.yaml
+```
+
+### Step 3 : XRC
+The XRC file is at `C:\PlatformEngineeringDemo\mgmtCluster\bootstrap\control-plane\compositions\prod-cluster-comp-final.yaml`, and it will need some edits before you apply it.
+
+This resource definition contains multiple resources. Below is what each one does and why it is included:
+
+1. crossplane-resourcegroup: for each new application, we create a dedicated resource group to hold that app's Azure resources.
+
+2. crossplane-workload-uai: each application gets its own [User Assigned Identity (UAI)](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-manage-user-assigned-managed-identities?pivots=identity-mi-methods-azp), which is used for [K8s Workload Identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-deploy-cluster) so workloads can authenticate to Azure without embedded secrets.
+
+3. crossplane-get-cluster-details: because this XRC sets up workload identity, we need to create federated identity credentials in Microsoft Entra for the UAI. For that, we need the `oidcIssuerUrl` from the AKS cluster. To read those cluster properties, we [import the existing AKS cluster into Crossplane](https://docs.crossplane.io/latest/guides/import-existing-resources/) (the one from the previous step, or another equivalent cluster). We set Crossplane management policy to `Observe` and provide the Azure cluster name and resource group, which means Crossplane reads the resource but does not change it. Key snippet:
+
+```yaml
+  apiVersion: containerservice.azure.upbound.io/v1beta1
+  kind: KubernetesCluster
+  metadata:
+    annotations:
+      crossplane.io/external-name: my56cluster
+  spec:
+    managementPolicies: ["Observe"]
+    forProvider:
+      resourceGroupName: my56app-kzzj2
+```
+This resource returns the `oidcIssuerUrl` and sets it as a label.
+
+4. crossplane-uai-fed: sets up the Federated Identity Credential. Here we use the `appname` input to build the Kubernetes namespace and service account values required for the `subject`. Those namespace and service account objects are created by the [Helm chart](https://github.com/danielsollondon/teaminfra/blob/main/infra/shared/k8s-cluster-config/main-infra-002/templates/app-ns-only.yaml) deployed as part of this flow.
+
+5. crossplane-kv: creates the Azure Key Vault used to store the DB connection string secret and any additional app secrets.
+
+6. crossplane-get-operating-uai-prinID: in later steps we inject the DB connection string into Azure Key Vault using the UAI that Crossplane uses to authenticate with Azure. To do that, we need the principal ID of that Crossplane operating identity and must grant it RBAC permissions to write the secret. We get this by importing the UAI in the same way as the AKS cluster, then setting an annotation with the principal ID.
+
+
+Important note: at the time of writing, this annotation requires the full resource ID of the UAI.
+```yaml
+apiVersion: managedidentity.azure.upbound.io/v1beta1
+kind: UserAssignedIdentity
+metadata:
+  annotations:
+    crossplane.io/external-name: /subscriptions/<subscriptionId>/resourceGroups/<mgmtClusterResGroup>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/kbl-infra002-uai
+spec:
+  managementPolicies: ["Observe"]
+  forProvider:
+    resourceGroupName: <mgmtClusterResGroup>
+```
+Update this value with your own UAI before deployment.
+
+7. crossplane-role-assign-pri: creates a role assignment for the Crossplane UAI and grants it the `Key Vault Secrets Officer` role on Key Vault.
+
+8. crossplane-db-secret: injects the DB connection string secret into Key Vault.
+
+9. crossplane-role-assign-reader: the Kubernetes workload identity UAI used by the app namespace needs read access to Key Vault so it can read the DB connection string key. Here we assign that UAI the `Key Vault Secrets User` role.
+
+10. create-argo-app: deploys the [app](https://github.com/danielsollondon/teaminfra/infra/shared/k8s-cluster-config/main-infra-002) and passes values to the Helm chart during deployment using the app-of-apps pattern.
+
+
+11. Add an environment configuration
+This composition can be deployed on an existing Kubernetes cluster with Argo, but you need a way for it to know which cluster it should connect to and configure. There are several options:
+  * Use [Crossplane Environment Configurations (Alpha)](https://docs.crossplane.io/latest/concepts/environment-configs/): this stores shared configuration (similar to a Kubernetes ConfigMap) that can be patched into resources in a composition.
+  * Use region input and transform it to a cluster name: similar to how location is handled, where a user provides EU or US and a [Crossplane map transform](https://docs.crossplane.io/latest/concepts/patch-and-transform/#map-transforms) in the XRC maps that to a valid Azure region.
+  * Use Fleet: you can avoid specifying a cluster name directly by using a preconfigured [AKS Fleet Manager](https://marketplace.upbound.io/providers/upbound/provider-azure-containerservice/latest/resources/containerservice.azure.upbound.io/KubernetesFleetManager/v1beta1) to coordinate workload placement based on inputs such as location or environment. This must be set up ahead of time.
+
+For this example, we will use Crossplane Environment Configuration and add the staging cluster configuration there.
+
+12. Enable the environment configuration feature in Crossplane: [--enable-environment-configs](https://docs.crossplane.io/latest/concepts/environment-configs/#enable-environmentconfigs).
+
+13. Create the configuration
+Create an EnvironmentConfig on the management cluster. This is where you store shared values (for example, downstream cluster name, resource group, and identity inputs) so the composition can patch them into resources.
+
+Add this file to `mgmtCluster/bootstrap/control-plane/`:
+
+```bash
+# Update the values below with the outputs you captured in Step 2.
+dsClusterName=<DOWNSTREAM CLUSTER NAME> # example: my56cluster
+dsCluRgname=<DOWNSTREAM CLUSTER RG NAME> # example: my56app-dde0064afd2f
+
+# This is the kubelet user-assigned identity used to create the management cluster.
+kblAksUai=kbl-infra002-uai
+mgmtClusterRg=rg-aks-pe-1598504785
+kblAksUaiId=$(az identity show --name $kblAksUai  --resource-group $mgmtClusterRg --query id --output tsv)
+
+cat > envConfig.yaml <<EOF
+apiVersion: apiextensions.crossplane.io/v1alpha1
+kind: EnvironmentConfig
+metadata:
+  name: base-app-config-team01
+  namespace: upbound-system
+data:
+  clustername: $dsClusterName
+  clusterrgname: $dsCluRgname
+  kblaksuaiid: $kblAksUai
+  mgmtclusterrg: $mgmtClusterRg
+EOF
+```
+
+PowerShell alternative:
+
+```powershell
+# Update the values below with the outputs you captured in Step 2.
+$dsClusterName = "<DOWNSTREAM CLUSTER NAME>" # example: my56cluster
+$dsCluRgname = "<DOWNSTREAM CLUSTER RG NAME>" # example: my56app-dde0064afd2f
+
+# This is the kubelet user-assigned identity used to create the management cluster.
+$kblAksUai = "kbl-identity-1598504785"
+$mgmtClusterRg = "rg-aks-pe-1598504785"
+$kblAksUaiId=$(az identity show --name $kblAksUai  --resource-group $mgmtClusterRg --query id --output tsv)
+
+@"
+apiVersion: apiextensions.crossplane.io/v1alpha1
+kind: EnvironmentConfig
+metadata:
+  name: base-app-config-team01
+  namespace: upbound-system
+data:
+  clustername: $dsClusterName
+  clusterrgname: $dsCluRgname
+  kblaksuaiid: $kblAksUai
+  mgmtclusterrg: $mgmtClusterRg
+"@ | Set-Content -Path .\envConfig.yaml
+```
+
+Note:
+- The Crossplane managedidentity provider is case-sensitive for external resource IDs. Keep this format and casing when referencing identity IDs:
+  - `/subscriptions/<subId>/resourceGroups/<mgmtclusterrg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/$kblAksUai = "kbl-identity-1598504785"`
+
+14. Commit the file to the repo under `mgmtCluster/bootstrap/control-plane/`; Argo will apply it.
+
+15. Add the XRD to the cluster
+
+```bash
+kubectl apply -f C:\PlatformEngineeringDemo\mgmtCluster\bootstrap\control-plane\compositions\prod-cluster-definitions.yaml
+```
+
+16.   Deploy workloads to the cluster
+This step creates two workloads and deploys apps that can read the DB connection string from Key Vault.
+
+```bash
+appname=baseapp01app
+appname2=baseapp02app
+teamname=team01
+repourl="https://github.com/oreakinodidi98/PlatformEngineeringDemo"
+repopath="workloads/team01/infra002"
+
+cat > team1-apps.yaml <<EOF
+apiVersion: compute.example.com/v1alpha1
+kind: base-stateful-app
+metadata:
+  name: $appname
+spec:
+  location: EU
+  appname: $appname
+  repourl: $repourl
+  repopath: $repopath
+---
+apiVersion: compute.example.com/v1alpha1
+kind: base-stateful-app
+metadata:
+  name: $appname2
+spec:
+  location: EU
+  appname: $appname2
+  repourl: $repourl
+  repopath: $repopath
+EOF
+```
+
+PowerShell alternative:
+
+```powershell
+$appname = "baseapp01app"
+$appname2 = "baseapp02app"
+$teamname = "team01"
+$repourl = "https://github.com/oreakinodidi98/PlatformEngineeringDemo"
+$repopath = "workloads/team01/infra002"
+
+@"
+apiVersion: compute.example.com/v1alpha1
+kind: base-stateful-app
+metadata:
+  name: $appname
+spec:
+  location: EU
+  appname: $appname
+  repourl: $repourl
+  repopath: $repopath
+---
+apiVersion: compute.example.com/v1alpha1
+kind: base-stateful-app
+metadata:
+  name: $appname2
+spec:
+  location: EU
+  appname: $appname2
+  repourl: $repourl
+  repopath: $repopath
+"@ | Set-Content -Path .\prod-team1-apps.yaml
+```
+
+Commit this file to the repo under `C:\PlatformEngineeringDemo\downstreamInfra\team01`; Argo will apply it.
+
+17. Check the deployment
+Use these Crossplane commands to verify claims, managed resources, and events:
+
+```bash
+# List claims for the CRD
+kubectl get base-stateful-app.compute.example.com
+
+# Describe each claim
+kubectl describe base-stateful-app.compute.example.com/$appname
+kubectl describe base-stateful-app.compute.example.com/$appname2
+
+# Show all managed Crossplane resources
+kubectl get managed
+
+# Describe a specific managed resource
+kubectl describe FederatedIdentityCredential.managedidentity.azure.upbound.io/baseapp02app-jzm7r
+
+# Show events
+kubectl get events
+```
+
+18.  Check that the secret is available to the pod
+
+```bash
+# Get kubeconfig for the downstream AKS cluster
+dsClusterName=<DOWNSTREAM CLUSTER NAME> # example: my56cluster
+dsCluRgname=<DOWNSTREAM CLUSTER RG NAME> # example: my56app-kzzj2
+
+az aks get-credentials --resource-group $dsCluRgname --name $dsClusterName --file DSCLU01
+
+# Check the connection string in each app pod environment
+KUBECONFIG=DSCLU01 kubectl exec -it busybox-secrets-store-inline-user-msi -n $appname printenv | grep db-conn
+KUBECONFIG=DSCLU01 kubectl exec -it busybox-secrets-store-inline-user-msi -n $appname2 printenv | grep db-conn
+```
+
+PowerShell alternative:
+
+```powershell
+$dsClusterName = "<DOWNSTREAM CLUSTER NAME>" # example: my56cluster
+$dsCluRgname = "<DOWNSTREAM CLUSTER RG NAME>" # example: my56app-kzzj2
+
+az aks get-credentials --resource-group $dsCluRgname --name $dsClusterName --file DSCLU01
+
+$env:KUBECONFIG = "DSCLU01"
+kubectl exec -it busybox-secrets-store-inline-user-msi -n $appname printenv | Select-String db-conn
+kubectl exec -it busybox-secrets-store-inline-user-msi -n $appname2 printenv | Select-String db-conn
+```
+
+19. Clean up
+
+```bash
+rm team1-apps.yaml
+```
+
+PowerShell alternative:
+
+```powershell
+Remove-Item .\team1-apps.yaml
+```
+
+Commit and push to the repo.
+
+## Recap
+You just simulated a preconfigured application environment end to end. The flow set up a shared team AKS cluster, created the workload identity path (identity, namespace, and service account), created Azure resources (Key Vault, secret objects, and user-assigned identity), created an Argo application, and deployed an app that can read the Key Vault secret without using a password.
+
+The key point is that the developer did not need to directly manage Kubernetes objects, pipeline wiring, or raw Azure resource setup. Those platform details were handled by the platform configuration and automation layers.
+
+This section is meant to help you understand the pattern, not to present a full production best-practice implementation. If you want a more complete reference architecture, use this example: [Azure AKS platform engineering sample](https://github.com/Azure-Samples/aks-platform-engineering).
