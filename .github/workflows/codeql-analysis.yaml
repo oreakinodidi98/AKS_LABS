@@ -14,19 +14,22 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     permissions:
+      # only required for workflows in private repositories
       actions: read
       contents: read
       security-events: write
+      # required to fetch internal or private CodeQL packs
+      packages: read
     strategy:
       fail-fast: false
       matrix:
         language: [ 'javascript', 'python', 'java' ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }} # or auto to detect languages automatically
      
