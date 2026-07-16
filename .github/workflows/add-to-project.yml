@@ -29,7 +29,10 @@ jobs:
     steps:
       - run: |
           if [ -n "$LABELS" ]; then
-            EXISTING_LABELS=$(gh api --paginate "repos/$GH_REPO/labels" --jq '.[].name')
+            EXISTING_LABELS=$(gh api --paginate "repos/$GH_REPO/labels" --jq '.[].name') || {
+              echo "Failed to fetch repository labels."
+              exit 1
+            }
             declare -A EXISTING_LABEL_MAP
             while IFS= read -r existing_label; do
               [ -z "$existing_label" ] && continue
@@ -39,7 +42,7 @@ jobs:
             while IFS= read -r label; do
               label=$(echo "$label" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
               [ -z "$label" ] && continue
-              if [ -n "${EXISTING_LABEL_MAP[$label]}" ]; then
+              if [ -n "${EXISTING_LABEL_MAP[$label]+set}" ]; then
                 VALID_LABELS+=("$label")
               else
                 echo "Label '$label' does not exist in repository, skipping."
