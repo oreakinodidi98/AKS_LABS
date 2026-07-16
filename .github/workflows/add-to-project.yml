@@ -29,20 +29,29 @@ jobs:
     steps:
       - run: |
           if [ -n "$LABELS" ]; then
-            EXISTING_LABELS=$(gh label list --limit 1000 --json name --jq '.[].name')
+            EXISTING_LABELS=$(gh api --paginate "repos/$GH_REPO/labels" --jq '.[].name')
             declare -A EXISTING_LABEL_MAP
             while IFS= read -r existing_label; do
               [ -z "$existing_label" ] && continue
               EXISTING_LABEL_MAP["$existing_label"]=1
             done <<< "$EXISTING_LABELS"
+            VALID_LABELS=()
             while IFS= read -r label; do
               [ -z "$label" ] && continue
               if [ -n "${EXISTING_LABEL_MAP["$label"]}" ]; then
-                gh issue edit "$NUMBER" --add-label "$label"
+                VALID_LABELS+=("$label")
               else
                 echo "Label '$label' does not exist in repository, skipping."
               fi
             done < <(echo "$LABELS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            if [ ${#VALID_LABELS[@]} -gt 0 ]; then
+              (
+                IFS=,
+                gh issue edit "$NUMBER" --add-label "${VALID_LABELS[*]}"
+              )
+            else
+              echo "No valid labels to add."
+            fi
           else
             echo "No label to add."
           fi
