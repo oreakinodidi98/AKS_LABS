@@ -76,16 +76,24 @@ This lab helps you quickly deploy powerful, flexible AI-powered applications to 
       - [Step 5: Create Azure OpenAI Resource](#step-5-create-azure-openai-resource)
       - [Step 6: Deploy Model](#step-6-deploy-model)
       - [Step 7: Assign Azure OpenAI Role](#step-7-assign-azure-openai-role)
-  - [MCP Shell Integration](#mcp-shell-integration)
-    - [What to Capture in This Section](#what-to-capture-in-this-section-1)
   - [Goose AI Agent](#goose-ai-agent)
-    - [What to Capture in This Section](#what-to-capture-in-this-section-2)
+    - [What to Capture in This Section](#what-to-capture-in-this-section-1)
   - [Azure Container Apps Dynamic Sessions](#azure-container-apps-dynamic-sessions-1)
-    - [What to Capture in This Section](#what-to-capture-in-this-section-3)
-  - [Build LangChain Application](#build-langchain-application)
-    - [What to Capture in This Section](#what-to-capture-in-this-section-4)
-  - [Deploy and Test](#deploy-and-test)
-    - [What to Capture in This Section](#what-to-capture-in-this-section-5)
+    - [Segment 4 - Use an MCP server with shell dynamic sessions in Azure Container Apps](#segment-4---use-an-mcp-server-with-shell-dynamic-sessions-in-azure-container-apps)
+    - [Preparing for future lab sections](#preparing-for-future-lab-sections)
+    - [Overview](#overview)
+    - [Learning Objectives](#learning-objectives-1)
+    - [1. Set Up Environment Variables](#1-set-up-environment-variables)
+    - [2. Fetch MCP Server Credentials](#2-fetch-mcp-server-credentials)
+    - [3. Initialize the MCP Server](#3-initialize-the-mcp-server)
+    - [4. Launch Shell Environment](#4-launch-shell-environment)
+    - [5. Run Commands in the Remote Shell](#5-run-commands-in-the-remote-shell)
+    - [6. Manage Files in the Remote Shell Session](#6-manage-files-in-the-remote-shell-session)
+      - [Step 1: Create a text file and verify its contents](#step-1-create-a-text-file-and-verify-its-contents)
+      - [Step 2: Install Python and create a script to rename the file](#step-2-install-python-and-create-a-script-to-rename-the-file)
+      - [Step 3: Verify the renamed file and read its contents](#step-3-verify-the-renamed-file-and-read-its-contents)
+    - [Roles explained](#roles-explained)
+    - [Why this is needed](#why-this-is-needed)
   - [🐛 Troubleshooting](#-troubleshooting)
     - [Common Issues](#common-issues)
     - [Getting Help](#getting-help)
@@ -1326,16 +1334,6 @@ az role assignment create `
 
 **Why this is needed:** This role allows your identity to make API calls to Azure OpenAI without requiring API keys (uses Azure AD authentication instead).
 
-
-## MCP Shell Integration
-
-### What to Capture in This Section
-
-- MCP server/tool configuration and startup command.
-- Shell integration steps and test command examples.
-- Verification results showing tool calls are working.
-
-
 ## Goose AI Agent
 
 ### What to Capture in This Section
@@ -1347,31 +1345,272 @@ az role assignment create `
 
 ## Azure Container Apps Dynamic Sessions
 
-### What to Capture in This Section
+### Segment 4 - Use an MCP server with shell dynamic sessions in Azure Container Apps
 
-- Session Pool configuration choices.
-- Security model and RBAC decisions.
-- Test run evidence (successful isolated execution).
+This segment uses the Terraform-managed shell session pool that is already provisioned in [ACA_Modernize/infra/main.tf](ACA_Modernize/infra/main.tf) and exported through [ACA_Modernize/infra/modules/aca/output.tf](ACA_Modernize/infra/modules/aca/output.tf).
 
+Default Terraform resource names in this repo:
 
-## Build LangChain Application
+- Resource group: `tf_aca_demo`
+- Shell session pool: `aca-sessionpool-shell-400`
+- Python session pool: `aca-sessionpool-python-400`
 
-### What to Capture in This Section
+The shell pool is provisioned with MCP enabled, dynamic lifecycle settings, a 5-session concurrency limit, and outbound network access enabled.
 
-- App architecture (chains/agents/tools/memory).
-- Environment variables required by the app runtime.
-- Local run steps and expected output.
-- Known limitations and next improvements.
+**What this does:**
+- Uses the Terraform-managed shell session pool.
+- Provides an isolated shell runtime for remote commands in MCP sessions.
+- `maxConcurrentSessions = 5`: Supports up to 5 concurrent shell sessions.
+- `coolDownPeriodInSeconds = 300`: Sessions stay warm for 5 minutes after use.
+- `sessionNetworkConfiguration.status = "EgressEnabled"`: Allows outbound network access from the shell session pool.
 
+---
 
-## Deploy and Test
+### Preparing for future lab sections
 
-### What to Capture in This Section
+If you have a separate Goose sample checkout, you can start that deployment in another terminal now so it finishes while you work through this MCP section.
 
-- Deployment command sequence.
-- Post-deploy smoke tests.
-- Validation checklist (health, logs, API responses, UI behavior).
-- Rollback or mitigation steps if validation fails.
+1. Open Windows Terminal or the integrated VS Code terminal.
+2. Start the Goose deployment in its own terminal window or tab.
+3. Leave that terminal running while you continue with the MCP steps below.
+
+---
+
+### Overview
+
+This segment walks through retrieving the shell pool MCP endpoint and API key, initializing the MCP server with JSON-RPC, launching a remote shell environment, and running commands inside that environment.
+
+Estimated duration: 45 minutes
+
+---
+
+### Learning Objectives
+
+- Use the shell session pool already provisioned by Terraform instead of creating a one-off ARM template.
+- Retrieve the shell pool management endpoint and MCP endpoint from Terraform outputs.
+- Fetch MCP server credentials for the shell session pool.
+- Initialize the MCP server with JSON-RPC.
+- Launch a remote shell environment and execute commands in it.
+
+---
+
+### 1. Set Up Environment Variables
+
+Start by opening Visual Studio Code and using a PowerShell terminal.
+
+```powershell
+az login
+az account show
+```
+
+Set the values for the subscription, resource group, shell pool name, and location.
+
+```powershell
+$env:SUBSCRIPTION_ID = (az account show --query id -o tsv).Trim()
+$env:RESOURCE_GROUP = "tf_aca_demo"
+$env:SHELL_SESSION_POOL_NAME = "aca-sessionpool-shell-400"
+$env:LOCATION = "swedencentral"
+```
+
+Retrieve the Terraform-exported endpoints for the shell pool.
+
+```powershell
+$env:SESSIONPOOL_MANAGEMENT_ENDPOINT_SHELL = (terraform -chdir=ACA_Modernize/infra output -raw sessionpool_management_endpoint_shell).Trim()
+$env:SESSIONPOOL_MCP_ENDPOINT_SHELL = (terraform -chdir=ACA_Modernize/infra output -raw sessionpool_mcp_endpoint_shell).Trim()
+```
+
+If you are also running the LangChain demo, keep the Python pool variables separate:
+
+- `SESSIONPOOL_MANAGEMENT_ENDPOINT_PYTHON`
+- `SESSIONPOOL_MCP_ENDPOINT_PYTHON`
+
+---
+
+### 2. Fetch MCP Server Credentials
+
+To interact with the MCP server, request credentials by calling the `fetchMCPServerCredentials` action on the shell session pool resource.
+
+```powershell
+$env:SESSIONPOOL_MCP_API_KEY = (az rest --method POST `
+   --uri "/subscriptions/$env:SUBSCRIPTION_ID/resourceGroups/$env:RESOURCE_GROUP/providers/Microsoft.App/sessionPools/$env:SHELL_SESSION_POOL_NAME/fetchMCPServerCredentials?api-version=2025-02-02-preview" `
+   --query apiKey -o tsv).Trim()
+```
+
+---
+
+### 3. Initialize the MCP Server
+
+Initialize the MCP server connection using JSON-RPC.
+
+```powershell
+curl -sS -X POST "$env:SESSIONPOOL_MCP_ENDPOINT_SHELL" `
+   -H "Content-Type: application/json" `
+   -H "x-ms-apikey: $env:SESSIONPOOL_MCP_API_KEY" `
+   -d '{ "jsonrpc": "2.0", "id": "1", "method": "initialize" }'
+```
+
+A successful response includes `protocolVersion` and `serverInfo`.
+
+---
+
+### 4. Launch Shell Environment
+
+Use the MCP `tools/call` method to launch a remote shell environment.
+
+```powershell
+$env:ENVIRONMENT_RESPONSE = curl -sS -X POST "$env:SESSIONPOOL_MCP_ENDPOINT_SHELL" `
+   -H "Content-Type: application/json" `
+   -H "x-ms-apikey: $env:SESSIONPOOL_MCP_API_KEY" `
+   -d '{ "jsonrpc": "2.0", "id": "2", "method": "tools/call", "params": { "name": "launchShellEnvironment", "arguments": {} } }'
+
+$env:ENVIRONMENT_RESPONSE
+```
+
+Copy the `environmentId` from the response and set it as an environment variable.
+
+```powershell
+$env:ENVIRONMENT_ID = "<paste-your-environment-id-here>"
+```
+
+---
+
+### 5. Run Commands in the Remote Shell
+
+Run a simple command inside the remote shell environment.
+
+```powershell
+curl -sS -X POST "$env:SESSIONPOOL_MCP_ENDPOINT_SHELL" `
+   -H "Content-Type: application/json" `
+   -H "x-ms-apikey: $env:SESSIONPOOL_MCP_API_KEY" `
+   -d @"
+{
+   "jsonrpc": "2.0",
+   "id": "3",
+   "method": "tools/call",
+   "params": {
+      "name": "runShellCommandInRemoteEnvironment",
+      "arguments": {
+         "environmentId": "$env:ENVIRONMENT_ID",
+         "shellCommand": "echo Hello from Azure Container Apps dynamic shell session!"
+      }
+   }
+}
+"@ | jq -r '.result.structuredContent.stdout'
+```
+
+Expected output:
+
+```text
+Hello from Azure Container Apps dynamic shell session!
+```
+
+---
+
+### 6. Manage Files in the Remote Shell Session
+
+Use the remote shell to create files, install packages, and run scripts.
+
+#### Step 1: Create a text file and verify its contents
+
+```powershell
+curl -sS -X POST "$env:SESSIONPOOL_MCP_ENDPOINT_SHELL" `
+   -H "Content-Type: application/json" `
+   -H "x-ms-apikey: $env:SESSIONPOOL_MCP_API_KEY" `
+   -d @"
+{
+   "jsonrpc": "2.0",
+   "id": "4",
+   "method": "tools/call",
+   "params": {
+      "name": "runShellCommandInRemoteEnvironment",
+      "arguments": {
+         "environmentId": "$env:ENVIRONMENT_ID",
+         "shellCommand": "echo \"Hello from remote shell!\" > hello.txt && echo \"Created file: hello.txt\" && echo \"Contents of hello.txt:\" && cat hello.txt"
+      }
+   }
+}
+"@ | jq -r '.result.structuredContent.stdout'
+```
+
+Expected output:
+
+```text
+Created file: hello.txt
+Contents of hello.txt:
+Hello from remote shell!
+```
+
+#### Step 2: Install Python and create a script to rename the file
+
+```powershell
+curl -sS -X POST "$env:SESSIONPOOL_MCP_ENDPOINT_SHELL" `
+   -H "Content-Type: application/json" `
+   -H "x-ms-apikey: $env:SESSIONPOOL_MCP_API_KEY" `
+   -d @"
+{
+   "jsonrpc": "2.0",
+   "id": "5",
+   "method": "tools/call",
+   "params": {
+      "name": "runShellCommandInRemoteEnvironment",
+      "arguments": {
+         "environmentId": "$env:ENVIRONMENT_ID",
+         "shellCommand": "echo \"Installing Python...\" && apt-get update -qq && apt-get install -y python3 -qq && echo \"Python installed successfully\" && python3 --version && echo && echo \"Creating rename script...\" && echo \"import os\" > rename_file.py && echo \"with open(\\\"hello.txt\\\", \\\"r\\\") as f:\" >> rename_file.py && echo \"    content = f.read()\" >> rename_file.py && echo \"print(\\\"Original file contains:\\\", content.strip())\" >> rename_file.py && echo \"os.rename(\\\"hello.txt\\\", \\\"hello_backup.txt\\\")\" >> rename_file.py && echo \"print(\\\"File renamed: hello.txt -> hello_backup.txt\\\")\" >> rename_file.py && echo && echo \"Running Python script...\" && python3 rename_file.py"
+      }
+   }
+}
+"@ | jq -r '.result.structuredContent.stdout'
+```
+
+Expected output:
+
+```text
+Installing Python...
+Python installed successfully
+Python 3.11.x
+
+Creating rename script...
+
+Running Python script...
+Original file contains: Hello from remote shell!
+File renamed: hello.txt -> hello_backup.txt
+```
+
+#### Step 3: Verify the renamed file and read its contents
+
+```powershell
+curl -sS -X POST "$env:SESSIONPOOL_MCP_ENDPOINT_SHELL" `
+   -H "Content-Type: application/json" `
+   -H "x-ms-apikey: $env:SESSIONPOOL_MCP_API_KEY" `
+   -d @"
+{
+   "jsonrpc": "2.0",
+   "id": "6",
+   "method": "tools/call",
+   "params": {
+      "name": "runShellCommandInRemoteEnvironment",
+      "arguments": {
+         "environmentId": "$env:ENVIRONMENT_ID",
+         "shellCommand": "echo \"Checking if rename was successful...\" && echo \"Files in directory:\" && ls -la *.txt *.py && echo && echo \"Reading contents of renamed file:\" && cat hello_backup.txt"
+      }
+   }
+}
+"@ | jq -r '.result.structuredContent.stdout'
+```
+
+---
+
+### Roles explained
+
+- **Azure Container Apps Session Executor**: Allows creating and executing code in sessions.
+- **Contributor**: Allows managing the session pool resource.
+
+### Why this is needed
+
+This role setup allows your identity to fetch MCP credentials and make API calls against the session pool without using a separate shared secret for the pool resource itself.
+
+> [!Note]
+> The shell MCP walkthrough uses the Terraform-managed shell pool. The Python pool and the LangChain sample remain separate and continue to use the Python-specific environment variables documented earlier in this file.
 
 
 ## 🐛 Troubleshooting
