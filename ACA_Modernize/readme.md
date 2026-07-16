@@ -42,12 +42,12 @@ This lab helps you quickly deploy powerful, flexible AI-powered applications to 
     - [4.4 Generate a streamed response](#44-generate-a-streamed-response)
     - [4.5 Return just the response](#45-return-just-the-response)
   - [Persist models and reduce cold starts in production](#persist-models-and-reduce-cold-starts-in-production)
-    - [Task 1 - Setup](#task-1---setup)
   - [Ollama \& Open-Source Models](#ollama--open-source-models)
     - [Aim](#aim)
     - [What to Capture in This Section](#what-to-capture-in-this-section)
     - [LangChain](#langchain)
     - [Code Interpreters](#code-interpreters)
+    - [Task 1 - Setup](#task-1---setup)
   - [MCP Shell Integration](#mcp-shell-integration)
     - [What to Capture in This Section](#what-to-capture-in-this-section-1)
   - [Goose AI Agent](#goose-ai-agent)
@@ -728,22 +728,6 @@ Serverless scaling in Azure Container Apps is great because it can autoscale to 
 4. Set a minimum replica count during business hours.
    - Keeping at least one replica running reduces latency from cold starts during peak periods.
 
-### Task 1 - Setup
-
-Open VS Code and authenticate with your Azure subscription using the Azure CLI.
-
-```bash
-az login
-```
-- Follow the instructions for signing in.  
-
-Confirm you're using the correct Azure subscription
-
-```bash
-az account show
-```
-
-**Expected output:** You should see your subscription ID, name, and tenant information. Verify this matches the subscription you want to use
 
 ## Ollama & Open-Source Models
 
@@ -773,6 +757,22 @@ Build a LangChain Agent with Azure Container Apps Dynamic Sessions (Code Interpr
 
 By using LangChain with code interpreters, you can build sophisticated AI agents that reason about when to execute code, what code to write, and how to interpret the results-all with minimal custom code.
 
+### Task 1 - Setup
+
+Open VS Code and authenticate with your Azure subscription using the Azure CLI.
+
+```bash
+az login
+```
+- Follow the instructions for signing in.  
+
+Confirm you're using the correct Azure subscription
+
+```bash
+az account show
+```
+
+**Expected output:** You should see your subscription ID, name, and tenant information. Verify this matches the subscription you want to use
 
 ## MCP Shell Integration
 
