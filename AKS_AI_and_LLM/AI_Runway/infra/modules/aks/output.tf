@@ -43,12 +43,6 @@ resource "local_file" "kube_config" {
   filename = local.kube_config_path
    depends_on = [azurerm_kubernetes_cluster.aks_cluster]
 }
-# # kube config certificate
-# resource "local_file" "client_certificate" {
-#   content  = base64decode(azurerm_kubernetes_cluster.aks_cluster.kube_config[0].client_certificate)
-#   filename = local.client_certificate_path
-#    depends_on = [azurerm_kubernetes_cluster.aks]
-# }
 #output aks kube config path
 output "kube_config_path" {
   value = local.kube_config_path
@@ -62,6 +56,27 @@ export KUBECONFIG=${local.kube_config_path}
 $KUBECONFIG = "${local.kube_config_path}"
 EOF
 }
+#output aks kube config path
+output "kube_host" {
+  value = azurerm_kubernetes_cluster.aks_cluster.kube_config[0].host
+}
+output "kube_username" {
+  value = azurerm_kubernetes_cluster.aks_cluster.kube_config[0].username
+}
+output "kube_password" {
+  value = azurerm_kubernetes_cluster.aks_cluster.kube_config[0].password
+}
+output "kube_client_certificate" {
+  value = base64decode(azurerm_kubernetes_cluster.aks_cluster.kube_config[0].client_certificate)
+}
+output "kube_client_key" {
+  value = base64decode(azurerm_kubernetes_cluster.aks_cluster.kube_config[0].client_key)
+}
+output "kube_cluster_ca_certificate" {
+  value = base64decode(azurerm_kubernetes_cluster.aks_cluster.kube_config[0].cluster_ca_certificate)
+}
+
+
 ########################## output for managed identity ##############################
 output "managed_identity_client_id" {
   value = azurerm_user_assigned_identity.aks_cluster.client_id

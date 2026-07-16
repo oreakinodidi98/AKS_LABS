@@ -26,29 +26,29 @@ resource "azurerm_resource_group" "resourcegroup" {
 }
 
 module "network" {
-  source        = "./modules/network"
-  location      = var.location
-  resourcegroup = azurerm_resource_group.resourcegroup.name
-  vnet_name     = "${var.vnet_name}${random_string.example.result}"
-  lustre_name   = "${var.lustre_name}${random_string.example.result}"
+  source          = "./modules/network"
+  location        = var.location
+  resourcegroup   = azurerm_resource_group.resourcegroup.name
+  vnet_name       = "${var.vnet_name}${random_string.example.result}"
+  lustre_name     = "${var.lustre_name}${random_string.example.result}"
   lustre_sku_name = var.lustre_sku_name
 }
 
 module "aks" {
-  source            = "./modules/aks"
-  resourcegroup     = azurerm_resource_group.resourcegroup.name
-  location          = var.location
-  aks_cluster_name  = var.aks_cluster_name
-  acr_name          = var.acr_name
-  log_analytics_id  = module.monitoring.azurerm_log_analytics_workspace_id
-  resourcegroup_id  = azurerm_resource_group.resourcegroup.id
-  identity_prefix   = var.identity_prefix
-  key_vault_id      = module.keyvault.key_vault_id
-  ssh_public_key    = var.ssh_public_key
-  aks_subnet_id     = module.network.CPU_subnet_id
-  dns_prefix       = "${var.dns_prefix}${random_string.example.result}"
+  source                = "./modules/aks"
+  resourcegroup         = azurerm_resource_group.resourcegroup.name
+  location              = var.location
+  aks_cluster_name      = var.aks_cluster_name
+  acr_name              = var.acr_name
+  log_analytics_id      = module.monitoring.azurerm_log_analytics_workspace_id
+  resourcegroup_id      = azurerm_resource_group.resourcegroup.id
+  identity_prefix       = var.identity_prefix
+  key_vault_id          = module.keyvault.key_vault_id
+  ssh_public_key        = var.ssh_public_key
+  aks_subnet_id         = module.network.CPU_subnet_id
+  dns_prefix            = "${var.dns_prefix}${random_string.example.result}"
   aks_infrence_tempname = "${var.aks_infrence_tempname}${random_string.example.result}"
-  depends_on = [module.network]
+  depends_on            = [module.network]
 }
 
 module "monitoring" {
