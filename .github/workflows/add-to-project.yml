@@ -44,7 +44,7 @@ jobs:
               else
                 echo "Label '$label' does not exist in repository, skipping."
               fi
-            done < <(echo "$LABELS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            done < <(echo "$LABELS" | tr ',' '\n')
             if [ ${#VALID_LABELS[@]} -gt 0 ]; then
               (
                 IFS=,
