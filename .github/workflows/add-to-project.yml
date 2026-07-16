@@ -29,7 +29,15 @@ jobs:
     steps:
       - run: |
           if [ -n "$LABELS" ]; then
-            gh issue edit "$NUMBER" --add-label "$LABELS"
+            EXISTING_LABELS=$(gh label list --limit 200 --json name --jq '.[].name')
+            while IFS= read -r label; do
+              [ -z "$label" ] && continue
+              if echo "$EXISTING_LABELS" | grep -Fxq "$label"; then
+                gh issue edit "$NUMBER" --add-label "$label"
+              else
+                echo "Label '$label' does not exist in repository, skipping."
+              fi
+            done < <(echo "$LABELS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           else
             echo "No label to add."
           fi
