@@ -42,8 +42,12 @@ This lab helps you quickly deploy powerful, flexible AI-powered applications to 
     - [4.4 Generate a streamed response](#44-generate-a-streamed-response)
     - [4.5 Return just the response](#45-return-just-the-response)
   - [Persist models and reduce cold starts in production](#persist-models-and-reduce-cold-starts-in-production)
+    - [Task 1 - Setup](#task-1---setup)
   - [Ollama \& Open-Source Models](#ollama--open-source-models)
+    - [Aim](#aim)
     - [What to Capture in This Section](#what-to-capture-in-this-section)
+    - [LangChain](#langchain)
+    - [Code Interpreters](#code-interpreters)
   - [MCP Shell Integration](#mcp-shell-integration)
     - [What to Capture in This Section](#what-to-capture-in-this-section-1)
   - [Goose AI Agent](#goose-ai-agent)
@@ -548,67 +552,71 @@ Azure Container Apps serverless GPUs automatically scale your application to zer
 
 **Goal:** Shell into the running container and pre-load the models you'll test.
 
+**Task 2 outcome:** Ollama is running, required models are pulled, and you can confirm they are installed.
+
 1. **Open the container console**
 
-    - In the Container App blade, select **Monitoring > Console**.
-    - If you select the field for **Based on revision**, you should see the latest revision selected. Choose the newest revision and replica (e.g., `gpuquickstart--0000004`).
-    - For **Choose start up command**, select `/bin/bash` and select **Connect** to launch a `/bin/bash` session.
+   - In the Container App blade, select **Monitoring > Console**.
+   - Under **Based on revision**, choose the latest revision and newest replica (for example, `gpuquickstart--0000004`).
+   - For **Choose startup command**, select `/bin/bash`, then select **Connect**.
 
-1. **Verify Ollama is running**
+2. **Verify Ollama is running**
 
-Type the following commands into the console:
-
-```bash
-  ps aux | grep ollama
-  ollama --version
-
-```
-You should get a response like this: 
-
-  **ollama --version is x.xx.xx**
-
-
-
-1. **Pull the requested models**
-
-Type the following commands into the console:
+   Run the following commands in the console:
 
 ```bash
- ollama pull smollm2:1.7b
- ollama pull deepseek-r1:14b
- ollama pull gpt-oss:20b
-
- ```
-
- **Note** Each download can take several minutes. Keep the console open until all pulls complete.
-
-1. **List installed models**
-
-Type the following commands into the console:
-
-```bash
- ollama list
+ps aux | grep ollama
+ollama --version
 ```
 
-You should see all three models with the **latest** digest.
+   You should get a response like:
+
+   **ollama --version is x.xx.xx**
+
+3. **Pull the requested models**
+
+   Run the following commands in the console:
+
+```bash
+ollama pull smollm2:1.7b
+ollama pull deepseek-r1:14b
+ollama pull gpt-oss:20b
+```
+
+   **Note:** Each download can take several minutes. Keep the console open until all pulls complete.
+
+4. **List installed models**
+
+   Run the following command:
+
+```bash
+ollama list
+```
+
+   You should see all three models with the **latest** digest.
 
 ---
 
 ## Task 3 - Compare Model Quality with Prompt Pack
 
-Use the console  to run these prompts against each model. The goal is to spot differences across the models.
+**Goal:** Compare quality, latency, and reasoning behavior across models using a fixed prompt pack.
 
- ```bash
- ollama run smollm2:1.7b "Explain the concept of vector databases to a new data engineer in under three sentences."
- ```
- ```bash
- ollama run deepseek-r1:14b "Write a Python function that generates a haiku using a small in-memory word list."
- ```
- ```bash
- ollama run gpt-oss:20b "Reason through this riddle: You see me once in a year, twice in a week, and never in a day. What am I?"`
+**Task 3 outcome:** You can clearly describe differences between SmolLM2, DeepSeek-R1, and GPT-OSS for your workload.
+
+Use the console to run these prompts against each model. The goal is to spot differences across model behavior.
+
+```bash
+ollama run smollm2:1.7b "Explain the concept of vector databases to a new data engineer in under three sentences."
+```
+```bash
+ollama run deepseek-r1:14b "Write a Python function that generates a haiku using a small in-memory word list."
+```
+```bash
+ollama run gpt-oss:20b "Reason through this riddle: You see me once in a year, twice in a week, and never in a day. What am I?"
 ```
 
 Pay attention to latency, depth of reasoning, and hallucination risk for each model. Experiment with your own prompts as well!
+
 | Prompt | What to Look For |
 | --- | --- |
 | Explain the concept of vector databases to a new data engineer in under three sentences. | Clarity + factual accuracy |
@@ -621,6 +629,8 @@ Pay attention to latency, depth of reasoning, and hallucination risk for each mo
 
 **Goal:** Interact with the Ollama server remotely using typical dev tooling.
 
+**Task 4 outcome:** You can validate model availability and generate responses through the Ollama HTTP API.
+
 ### 4.1 Set the container app endpoint as an environment variable
 
 1. **Get your container app URL**
@@ -628,28 +638,29 @@ Pay attention to latency, depth of reasoning, and hallucination risk for each mo
    - Use the copy icon to the right of the **Application URL** to copy the Application URL to the clipboard.
 
 2. **Set the environment variable**
-   - Open VS Code on the lab host.
-   - Open the WSL terminal.
    - Run the following command, replacing `<Your Container App URL>` with the URL you copied:
 
     ```bash
     export OLLAMA_URL="<Your Container App URL>"
+    $env:OLLAMA_URL= "<Your Container App URL>"
     ```
 
 3. **Verify the variable is set**
 
     ```bash
     echo $OLLAMA_URL
+    $env:OLLAMA_URL
     ```
 
    You should see your container app URL displayed.
 
 ### 4.2 List installed models
 
-Run the following command in the WSL terminal:
+Run the following command in your terminal:
 
 ```bash
 curl -s $OLLAMA_URL/api/tags | jq
+curl -s $env:OLLAMA_URL/api/tags | jq
 ```
 This will display all models currently available on your Ollama server.
 
@@ -661,9 +672,11 @@ This will display all models currently available on your Ollama server.
   curl $OLLAMA_URL/api/show \
   -H "Content-Type: application/json" \
   -d '{"model":"smollm2:1.7b"}'
+
+  curl $env:OLLAMA_URL/api/show -H "Content-Type: application/json" -d '{"model":"smollm2:1.7b"}'
   ```
 
-Both commands will return detailed metadata about the specified model, including its parameters, architecture, and system requirements.
+This returns detailed metadata about the model, including parameters, architecture, and system requirements.
 
 ### 4.4 Generate a streamed response
 
@@ -678,6 +691,11 @@ Run the following command to test text generation using curl:
     "model": "smollm2:1.7b",
     "prompt": "Explain the concept of vector databases."
   }'
+
+  curl $env:OLLAMA_URL/api/generate -H "Content-Type: application/json" -d '{
+    "model": "smollm2:1.7b",
+    "prompt": "Explain the concept of vector databases."
+  }'
   ```
 
   You'll see the response stream in real-time as the model generates text.
@@ -687,9 +705,7 @@ Run the following command to test text generation using curl:
 - By running this command without streaming and parsing the JSON response, you can extract the generated text:
 
   ```bash
-    curl $OLLAMA_URL/api/generate \
-      -H "Content-Type: application/json" \
-      -d '{
+    curl $env:OLLAMA_URL/api/generate -H "Content-Type: application/json" -d '{
         "model": "smollm2:1.7b",
         "prompt": "Explain the concept of vector databases.",
         "stream": false
@@ -702,23 +718,61 @@ Run the following command to test text generation using curl:
 
 ## Persist models and reduce cold starts in production
 
-Serverless scaling in Azure Container Apps are great as they can autoscale into zero. However, the storage isn't persisted which means you have to redownload models after each scale-to-zero event which can cause significant coldstart. Below, are patterns we see customers adopt to improve their cold start times in production. These are also our recommendations.
+Serverless scaling in Azure Container Apps is great because it can autoscale to zero. The trade-off is that storage is not persistent by default, so models may need to be re-downloaded after each scale-to-zero event, which increases cold-start time. Below are patterns we see customers use in production to improve startup performance.
 
-1. Add an [Azure Files volume mount](https://learn.microsoft.com/azure/container-apps/storage-mounts-azure-files?tabs=bash) to your Azure Container App - By adding a volume mount, your models can be stored persistently, preventing the need to redownload them after scaling to zero. Instead, models are loaded from the mounted volume, significantly reducing cold start times. For an Ollama contianer image, you would mount the volume at `/var/lib/ollama`.
-1. Customers also will set cron scalars and other scalars to ensure that the GPUs are pre-warmed prior to expected traffic spikes.
-1. Use Azure Container Registry artifact streaming to enable your container to startup faster by streaming layers on demand.
-1. Set a minimum replica count during business hours - By configuring your Container App to maintain at least one running replica during peak usage times, you can ensure that the application is always ready to handle requests without the latency associated with cold starts.
+1. Add an [Azure Files volume mount](https://learn.microsoft.com/azure/container-apps/storage-mounts-azure-files?tabs=bash) to your Azure Container App.
+   - This stores models persistently and avoids re-downloading after scale-to-zero.
+   - For an Ollama container image, mount the volume at `/var/lib/ollama`.
+2. Use cron scalers or other scalers to pre-warm GPUs ahead of expected traffic spikes.
+3. Use Azure Container Registry artifact streaming so containers can start faster by streaming layers on demand.
+4. Set a minimum replica count during business hours.
+   - Keeping at least one replica running reduces latency from cold starts during peak periods.
 
+### Task 1 - Setup
 
+Open VS Code and authenticate with your Azure subscription using the Azure CLI.
+
+```bash
+az login
+```
+- Follow the instructions for signing in.  
+
+Confirm you're using the correct Azure subscription
+
+```bash
+az account show
+```
+
+**Expected output:** You should see your subscription ID, name, and tenant information. Verify this matches the subscription you want to use
 
 ## Ollama & Open-Source Models
 
+### Aim
+Build a LangChain Agent with Azure Container Apps Dynamic Sessions (Code Interpreter)
+
 ### What to Capture in This Section
 
-- Model names and tags pulled.
-- Hosting mode (local, containerized, or remote endpoint).
-- Expected startup/warmup behavior.
-- Performance notes (latency, throughput, memory/GPU impact).
+- Use a pre-provisioned Azure Container Apps **Dynamic Session Pool** for Python code execution in a code interpreter.
+- Connect the pool to a **LangChain agent** via the **langchain-azure-dynamic-sessions** package.
+- Expose a **FastAPI web API** with endpoints for natural language queries and file analysis.
+- Validate with tasks: math calculation, plotting, and CSV summarization.
+
+### LangChain
+
+**LangChain** is a powerful framework for building applications powered by large language models (LLMs). It provides a standardized interface for connecting LLMs with external tools, data sources, and APIs. In this demo, LangChain acts as the orchestration layer that:
+- Connects Azure OpenAI's GPT models with the Azure Container Apps Dynamic Sessions code execution environment
+- Manages the conversation flow between user queries and code interpreters
+- Handles tool selection and parameter passing automatically
+- Provides built-in retry logic, error handling, and response parsing
+
+> [!Note] LangChain is the focus for this section of the demo, but the same patterns apply to other agents. Microsoft's newly released [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/overview/agent-framework-overview) is a great alternative, and you'll experiment with [Goose](https://github.com/block/goose) later in the demo as well.
+
+### Code Interpreters
+
+**Code interpreters** are secure, isolated environments that allow AI agents to write and execute code dynamically in response to user queries. Unlike traditional chatbots that can only generate text responses, code interpreters enable AI systems to perform actual computations, analyze data, create visualizations, and manipulate files in real-time. This capability transforms AI agents from conversational tools into powerful problem-solving assistants that can handle complex mathematical calculations, data analysis tasks, and generate visual outputs like charts and graphs. Azure Container Apps Dynamic Sessions provides enterprise-grade code interpreter functionality with built-in security, scalability, and integration with popular AI frameworks like LangChain.
+
+By using LangChain with code interpreters, you can build sophisticated AI agents that reason about when to execute code, what code to write, and how to interpret the results-all with minimal custom code.
+
 
 ## MCP Shell Integration
 
@@ -837,3 +891,5 @@ Use these links when you want deeper implementation detail beyond the lab flow.
 - [Azure CLI Reference](https://learn.microsoft.com/cli/azure/)
 - [Azure SDK for Python](https://learn.microsoft.com/python/azure/)
 - [LangChain Azure Integration](https://python.langchain.com/docs/integrations/platforms/microsoft)
+- - [Gpt-oss on Azure Container Apps](https://techcommunity.microsoft.com/blog/appsonazureblog/open-ais-gpt-oss-models-on-azure-container-apps-serverless-gpus/4440836)
+- [Deepseek-r1 on Azure Container Apps](https://techcommunity.microsoft.com/blog/appsonazureblog/deepseek-r1-on-azure-container-apps-serverless-gpus/4371463)

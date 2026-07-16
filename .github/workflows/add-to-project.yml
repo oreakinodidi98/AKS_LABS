@@ -1,0 +1,37 @@
+name: Add new issues to this GH Project
+
+on:
+  issues:
+    types:
+      - opened
+
+env:
+  PROJECT_URL: ${{ vars.PROJECT_URL }}
+
+jobs:
+  add-to-project:
+    name: Add issue to project
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+  label_issues:
+    needs: add-to-project
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - run: |
+          if [ -n "$LABELS" ]; then
+            gh issue edit "$NUMBER" --add-label "$LABELS"
+          else
+            echo "No label to add."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          LABELS: ${{ vars.ISSUE_LABEL }}
