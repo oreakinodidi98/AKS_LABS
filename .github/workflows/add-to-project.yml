@@ -12,12 +12,15 @@ jobs:
   add-to-project:
     name: Add issue to project
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
+      issues: read
+      repository-projects: write
     steps:
-      - uses: actions/add-to-project@v1.0.2
+      - uses: actions/add-to-project@v1
         with:
           project-url: ${{ env.PROJECT_URL }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT || secrets.GITHUB_TOKEN }}
   label_issues:
     needs: add-to-project
     runs-on: ubuntu-latest
