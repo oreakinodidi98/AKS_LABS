@@ -38,3 +38,14 @@ This repository is for AKS demos that can be used in VBDs and should:
 - License files (`LICENSE`, `CODE_OF_CONDUCT.md`)
 - Security files (`SECURITY.md`)
 - GitHub workflow files in `.github/` directory
+
+### Issue Management
+When a user reports a problem, asks a question that should be tracked, or wants to file an issue:
+
+1. **Discover available templates** — Check `.github/ISSUE_TEMPLATE/` for any `.yml` or `.md` template files. Read them to understand what fields and labels each template expects.
+2. **Match the request to a template** — Based on what the user is describing, pick the best-fit template. If no templates exist, create a plain issue.
+3. **Help the user fill in the fields** — Walk through the template's required fields interactively, proposing answers where possible.
+4. **Create the issue** — Use `gh issue create --template <template-file>` if a template matches, or `gh issue create` for a plain issue.
+5. **Apply labels** — Check `gh label list` to see what labels exist in the repo. Apply relevant labels based on the issue type. Don't try to apply labels that don't exist.
+
+When reviewing open issues at the start of each phase, summarize them and propose actions — this behavior already exists in the Issue Tracking and Commits section of GUIDANCE.md.
