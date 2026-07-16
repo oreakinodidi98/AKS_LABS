@@ -47,7 +47,35 @@ This lab helps you quickly deploy powerful, flexible AI-powered applications to 
     - [What to Capture in This Section](#what-to-capture-in-this-section)
     - [LangChain](#langchain)
     - [Code Interpreters](#code-interpreters)
+  - [Dynamic Sessions](#dynamic-sessions)
+    - [Validated Runbook (Recommended for This Repo)](#validated-runbook-recommended-for-this-repo)
+      - [What to Verify Before Running](#what-to-verify-before-running)
+      - [Required Environment Variables for This Sample](#required-environment-variables-for-this-sample)
+      - [Verified Setup Steps (Accurate Path)](#verified-setup-steps-accurate-path)
+      - [Run and Validate (Current Sample Behavior)](#run-and-validate-current-sample-behavior)
+      - [Expected Output Reality Check](#expected-output-reality-check)
     - [Task 1 - Setup](#task-1---setup)
+      - [Understanding the **.env** file](#understanding-the-env-file)
+      - [Populating the **.env** file](#populating-the-env-file)
+      - [Step 4: Review the Python virtual environment](#step-4-review-the-python-virtual-environment)
+      - [Step 5: Activate the virtual environment](#step-5-activate-the-virtual-environment)
+      - [Step 6: Review Installed application dependencies](#step-6-review-installed-application-dependencies)
+    - [Task 4 - Run the Application](#task-4---run-the-application)
+      - [Understanding **main.py**](#understanding-mainpy)
+      - [Step 7: Run the LangChain agent](#step-7-run-the-langchain-agent)
+    - [Task 5 - Validate Agent Behavior](#task-5---validate-agent-behavior)
+      - [1. **Validate baseline run:**](#1-validate-baseline-run)
+      - [2. **Validate authentication path:**](#2-validate-authentication-path)
+      - [3. **Validate custom prompt behavior (optional):**](#3-validate-custom-prompt-behavior-optional)
+  - [Dynamic Sessions End to end Setup (Optional)](#dynamic-sessions-end-to-end-setup-optional)
+    - [Part 1: Infrastructure Setup](#part-1-infrastructure-setup)
+      - [Step 1: Authenticate and Set Environment Variables](#step-1-authenticate-and-set-environment-variables)
+      - [Step 2: Create Resource Group](#step-2-create-resource-group)
+      - [Step 3: Create Dynamic Session Pool](#step-3-create-dynamic-session-pool)
+      - [Step 4: Assign Session Pool Roles](#step-4-assign-session-pool-roles)
+      - [Step 5: Create Azure OpenAI Resource](#step-5-create-azure-openai-resource)
+      - [Step 6: Deploy Model](#step-6-deploy-model)
+      - [Step 7: Assign Azure OpenAI Role](#step-7-assign-azure-openai-role)
   - [MCP Shell Integration](#mcp-shell-integration)
     - [What to Capture in This Section](#what-to-capture-in-this-section-1)
   - [Goose AI Agent](#goose-ai-agent)
@@ -738,7 +766,7 @@ Build a LangChain Agent with Azure Container Apps Dynamic Sessions (Code Interpr
 
 - Use a pre-provisioned Azure Container Apps **Dynamic Session Pool** for Python code execution in a code interpreter.
 - Connect the pool to a **LangChain agent** via the **langchain-azure-dynamic-sessions** package.
-- Expose a **FastAPI web API** with endpoints for natural language queries and file analysis.
+- Run a **LangChain agent script** that handles natural language tasks and code execution.
 - Validate with tasks: math calculation, plotting, and CSV summarization.
 
 ### LangChain
@@ -757,7 +785,147 @@ Build a LangChain Agent with Azure Container Apps Dynamic Sessions (Code Interpr
 
 By using LangChain with code interpreters, you can build sophisticated AI agents that reason about when to execute code, what code to write, and how to interpret the results-all with minimal custom code.
 
+## Dynamic Sessions
+
+Use Dynamic Sessions to run code in isolated, short-lived sandboxes while keeping your local machine safe.
+
+Why this matters:
+
+- You get real execution power (Python and Bash) without running untrusted code on your host.
+- You can do file upload/download in the sandbox and move results back locally.
+- You can combine shell + Python tools in a single agent workflow.
+
+Core capabilities:
+
+1. Python REPL execution.
+2. Bash command execution.
+3. Remote file upload/download.
+4. Per-session isolation (clean boundary from host environment).
+
+### Validated Runbook (Recommended for This Repo)
+
+Use this runbook first. It is aligned to the current files in this repository and keeps your original lab notes below for reference.
+
+> [!Important]
+> In the current repository state, `container-apps-dynamic-sessions-samples/langchain-python-webapi/main.py` runs as a LangChain script (CLI-style) and does **not** expose FastAPI endpoints such as `/chat` or `/health`.
+>
+> That means:
+> - Use `python main.py` to run the sample.
+> - Do not expect `uvicorn` startup output in this sample.
+> - Do not expect `http://localhost:8000/docs` in this sample.
+
+#### What to Verify Before Running
+
+1. You are signed in with Azure CLI and using the correct subscription.
+2. Dynamic Session Pool endpoints are available.
+3. The `.env` file contains required keys used by `main.py`.
+4. Your Python virtual environment is active.
+
+#### Required Environment Variables for This Sample
+
+These variable names are what the current `main.py` requires:
+
+- `LLM_MODEL_DEPLOYMENT_NAME_CHATGPT`
+- `FOUNDRY_API_KEY`
+- `FOUNDRY_ENDPOINT`
+- `SESSIONPOOL_MANAGEMENT_ENDPOINT_SHELL`
+- `SESSIONPOOL_MANAGEMENT_ENDPOINT_PYTHON`
+- `SESSIONPOOL_MCP_ENDPOINT_SHELL`
+- `SESSIONPOOL_MCP_ENDPOINT_PYTHON`
+
+> [!Tip]
+> Keep your original variables too if you need them for other sections. For this script specifically, the list above is what is validated in code.
+
+#### Verified Setup Steps (Accurate Path)
+
+1. Sign in and confirm context:
+
+   ```bash
+   az login
+   az account show
+   ```
+
+   Expected result:
+   - `az login` completes successfully and opens/authenticates your account.
+   - `az account show` returns your active subscription JSON.
+
+2. Go to the sample folder:
+
+   ```bash
+   cd container-apps-dynamic-sessions-samples/langchain-python-webapi
+   ```
+
+3. Create your env file from the sample template:
+
+   ```bash
+   cp .env.sample .env
+   ```
+
+4. Populate `.env` with real values for all required variables listed above.
+
+5. Activate virtual environment:
+
+   ```bash
+   source venv/bin/activate
+   ```
+
+   Expected result:
+   - Your shell prompt shows `(venv)`.
+
+6. (Optional) Install dependencies if needed:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+#### Run and Validate (Current Sample Behavior)
+
+1. Run the app script:
+
+   ```bash
+   python main.py
+   ```
+
+   Expected result:
+   - The script runs an agent flow and prints streamed/pretty-printed messages in the terminal.
+   - You should see activity related to tool use (Python/Bash session tools), not HTTP server startup logs.
+
+2. If authentication fails:
+   - Re-run `az login`.
+   - Verify subscription with `az account show`.
+   - Re-run `python main.py`.
+
+3. If env validation fails:
+   - You will see a runtime error like `Missing required environment variable: <NAME>`.
+   - Add the missing variable to `.env` and retry.
+
+#### Expected Output Reality Check
+
+For this sample as currently committed:
+
+- Valid expected output:
+  - Terminal prints from agent execution.
+  - Possible Azure token or missing-env errors if configuration is incomplete.
+
+- Not expected in this sample:
+  - `INFO: Uvicorn running on http://127.0.0.1:8000`
+  - Swagger UI at `http://localhost:8000/docs`
+  - Curl calls to `/chat` or `/health`
+
+---
+
 ### Task 1 - Setup
+
+> [!Note]
+> Original notes below are preserved as requested. For the most accurate step-by-step flow in this repo state, use the **Validated Runbook (Recommended for This Repo)** section above.
+
+Run Terraform file in infra to set up enviroment
+1. Provision Dynamic Session pools with Terraform (Python and Shell pools).
+2. Activate virtual environment:
+   - `agent_env\Scripts\activate`
+3. Ensure environment variables are configured:
+   - `SESSIONPOOL_MANAGEMENT_ENDPOINT_PYTHON`
+   - `SESSIONPOOL_MANAGEMENT_ENDPOINT_SHELL`
 
 Open VS Code and authenticate with your Azure subscription using the Azure CLI.
 
@@ -773,6 +941,391 @@ az account show
 ```
 
 **Expected output:** You should see your subscription ID, name, and tenant information. Verify this matches the subscription you want to use
+
+Change to the directory containing the LangChain Python web API sample code.
+
+```bash
+cd container-apps-dynamic-sessions-samples/langchain-python-webapi
+```
+
+**What this does:**  This directory contains:
+- **main.py** - The LangChain agent runner script with Azure Dynamic Sessions tools
+- **.env.sample** - Sample configuration file with Azure resource endpoints and credentials
+- **requirements.txt** - Python package dependencies
+
+**Description:** Before running the application, let's understand the key resources that make it work.
+
+---
+
+#### Understanding the **.env** file
+
+The **.env** file contains all the configuration settings needed to connect your application to Azure services. It stores:
+
+- **SESSIONPOOL_MANAGEMENT_ENDPOINT_PYTHON** - The management endpoint for your Azure Container Apps Dynamic Session Pool
+- **FOUNDRY_ENDPOINT** - The endpoint URL for your Azure OpenAI service
+- **LLM_MODEL_DEPLOYMENT_NAME_CHATGPT** - The name of your deployed GPT model (e.g., **gpt-4o-mini**)
+- **FOUNDRY_API_KEY** - The API key to use for Azure OpenAI calls
+
+**Why this is valuable:** 
+- Separates configuration from code, making it easy to switch between development, staging, and production environments
+- Keeps sensitive information (endpoints and identifiers) out of source code
+- Follows the "twelve-factor app" methodology for cloud-native applications
+- The **.env** file has been pre-configured with your lab environment's resource endpoints
+
+**Security note:** In production environments, you would use Azure Key Vault or managed identities instead of storing credentials in files.
+
+---
+
+#### Populating the **.env** file
+
+Create a new **.env** file using the VS Code wsl terminal:
+
+ ```bash
+ cd container-apps-dynamic-sessions-samples/langchain-python-webapi
+ cp .env.sample .env
+```
+
+And open the new .env file in the explorer on the left.
+
+Locate and copy/paste the following variables into your .env file:
+
+1. **Pool Management Endpoints**
+- In the Azure Portal, search for `Container App Session Pool` and click on **Container App Session Pool** .  Open the Container App Session Pool resource displayed, then copy the Pool Management Endpoint displayed on the top right and paste it into the .env file.  
+
+```bash
+SESSIONPOOL_MANAGEMENT_ENDPOINT_PYTHON=<Python Pool Management Endpoint>
+SESSIONPOOL_MANAGEMENT_ENDPOINT_SHELL=<Shell Pool Management Endpoint>
+SESSIONPOOL_MCP_ENDPOINT_PYTHON=<Python Pool MCP Endpoint>
+SESSIONPOOL_MCP_ENDPOINT_SHELL=<Shell Pool MCP Endpoint>
+```
+
+
+2. **OpenAI Endpoint and Key**
+- In the Azure Portal, search for `Azure OpenAI` and click on **Azure OpenAI** .  Open the Azure OpenAI resource displayed. On the left, go to **Resource Management > Keys and Endpoint**  and copy/paste the following values:
+
+```bash
+FOUNDRY_ENDPOINT=<Endpoint>
+FOUNDRY_API_KEY=<KEY 1>
+```
+3. **Model Name**
+
+-From Keys and Endpoint, click on **Overview** on the top left then click on **Go to Azure AI Foundry Portal** towards the top on the left.   
+-If you are asked to log in again, follow the same steps from the previous login process.  
+-Once in the foundry, click on **Deployments** on the left, and copy and paste the **Model Name** into the .env file.
+
+```bash
+LLM_MODEL_DEPLOYMENT_NAME_CHATGPT=<Model Deployment Name>
+```
+
+- Once complete, you should have all required values in your new .env file.  
+- save the .env file
+
+```bash
+FOUNDRY_ENDPOINT=<Endpoint>
+FOUNDRY_API_KEY=<KEY 1>
+LLM_MODEL_DEPLOYMENT_NAME_CHATGPT=<Model Deployment Name>
+SESSIONPOOL_MANAGEMENT_ENDPOINT_PYTHON=<Python Pool Management Endpoint>
+SESSIONPOOL_MANAGEMENT_ENDPOINT_SHELL=<Shell Pool Management Endpoint>
+SESSIONPOOL_MCP_ENDPOINT_PYTHON=<Python Pool MCP Endpoint>
+SESSIONPOOL_MCP_ENDPOINT_SHELL=<Shell Pool MCP Endpoint>
+```
+**Security note:** In production environments, you would use Azure Key Vault or managed identities instead of storing credentials in files.
+
+---
+
+#### Step 4: Review the Python virtual environment
+
+An isolated Python environment has already been created and populated with application dependencies.
+
+**What this is:** A new directory called **venv** contains a complete Python environment. This keeps the lab dependencies separate from your system Python installation, preventing version conflicts.
+
+**Why this is valuable:** Virtual environments are a Python best practice that ensure reproducible builds and prevent dependency conflicts between different projects.
+
+---
+
+#### Step 5: Activate the virtual environment
+
+Activate the virtual environment so that Python commands use the isolated environment.
+
+Make sure that you are in the application directory:
+
+**../container-apps-dynamic-sessions-samples/langchain-python-webapi**
+
+```bash
+source venv/bin/activate
+```
+
+**What this does:** Modifies your shell's PATH to prioritize the virtual environment's Python interpreter and packages. You'll see **(venv)** appear at the beginning of your command prompt.
+
+**Note:** You'll need to run this command again if you open a new terminal session.
+
+---
+
+#### Step 6: Review Installed application dependencies
+
+the command **pip install -r requirements.txt** preinstalled all required Python packages from the requirements file.
+
+**What this did:** Installs the following key packages:
+- **langchain** & **langgraph** - Core agent orchestration
+- **langchain-openai** - Azure OpenAI-compatible chat model integration
+- **langchain-azure-dynamic-sessions** - Python and Bash tool execution in Azure Dynamic Sessions
+- **langchain-mcp-adapters** - MCP integration helpers
+- **langchain_azure_cosmosdb** - Optional Cosmos DB integration support
+- **markdownify** - Content conversion helper
+
+**Note:** Dependencies are preinstalled, as it typically takes 10 minutes or more to download and install all dependencies.
+
+
+### Task 4 - Run the Application
+
+**Description:** In this task, you'll run the LangChain agent script and confirm it can call Dynamic Sessions tools.
+
+---
+
+#### Understanding **main.py**
+
+The **main.py** file is the heart of your application. It:
+
+1. **Imports and initializes LangChain components:**
+   - Creates an Azure OpenAI chat model instance
+   - Initializes Azure Dynamic Sessions tools for Python and Bash execution
+   - Configures a LangChain agent with those tools
+
+2. **Validates required environment variables:**
+   - Fails fast with a clear error if a required variable is missing
+   - Uses Azure CLI credentials to obtain access tokens for Dynamic Sessions
+
+3. **Manages the agent execution flow:**
+   - Uses a preset user question in the script
+   - Determines if code execution is needed
+   - Executes Python and/or Bash commands in Azure Dynamic Sessions
+   - Returns results back to the user
+
+**Why this is valuable:**
+- Demonstrates how to build production-ready AI agents with proper error handling
+- Shows best practices for integrating Azure services with LangChain
+- Provides a reusable pattern for building code-execution-powered AI applications
+- Provides a terminal-first execution loop that is easy to debug during labs
+
+---
+
+#### Step 7: Run the LangChain agent
+
+Run the script directly:
+
+```bash
+python main.py
+```
+
+**What this does:**
+- Loads `.env` and validates required configuration
+- Creates the model + tool-enabled agent
+- Sends the built-in prompt and streams agent output in the terminal
+
+**Expected output:** You should see streamed agent/tool messages in the terminal. If configuration is incomplete, you'll see a clear error (for example, missing environment variable or Azure authentication failure).
+
+Example error patterns you might see while setting up:
+
+```bash
+RuntimeError: Missing required environment variable: <NAME>
+RuntimeError: Failed to acquire Azure token for Dynamic Sessions
+```
+
+**Note:** Keep this terminal open while the run completes so you can inspect tool calls and generated outputs.
+
+---
+
+### Task 5 - Validate Agent Behavior
+
+**Description:** This task verifies that your LangChain agent can successfully execute code in Azure Dynamic Sessions.
+
+#### 1. **Validate baseline run:**
+
+- Run:
+
+```bash
+python main.py
+```
+
+- Confirm the agent returns a complete response and no missing-env errors.
+
+#### 2. **Validate authentication path:**
+
+- If token acquisition fails, run:
+
+```bash
+az login
+az account show
+python main.py
+```
+
+- Expected result: run succeeds after login and prints agent output.
+
+#### 3. **Validate custom prompt behavior (optional):**
+
+- In `main.py`, update the `question` variable to one of these prompts and rerun:
+
+1. Math calculation test:
+
+```text
+Calculate the mean of 1,2,3,100 using Python.
+```
+
+Expected result: approximately `26.5`.
+
+2. Data visualization test:
+
+```text
+Plot sin(x) from -1 to 1 and report the peak value.
+```
+
+Expected result: peak value approximately `0.8415`.
+
+3. Bash capability test:
+
+```text
+Create a hello world flask app in a new remote environment, then send a request to show it works.
+```
+
+Expected result: the agent uses shell + Python tooling to scaffold and verify the app within the session environment.
+
+---
+
+## Dynamic Sessions End to end Setup (Optional)
+
+- This section walks you through the complete infrastructure setup, including creating the resource group, session pool, Azure OpenAI service, and all necessary role assignments.
+
+---
+
+### Part 1: Infrastructure Setup
+
+#### Step 1: Authenticate and Set Environment Variables
+
+Sign in to Azure and configure your environment variables for the deployment.
+
+```powershell
+# User Information
+$env:USER_PRINCIPAL_NAME = (az ad signed-in-user show --query userPrincipalName -o tsv).Trim()
+$env:USER_OBJECT_ID = (az ad signed-in-user show --query id -o tsv).Trim()
+
+# Azure Resources
+$random = Get-Random -Minimum 10000 -Maximum 99999
+$env:RG = "aca-langchain-rg-$env:USERNAME-$random"
+$env:LOCATION = "swedencentral"
+$env:POOL = "aca-langchain-py-$env:USERNAME-$random"
+$env:OPENAI_NAME = "openai-aca-$env:USERNAME-$random"
+$env:OPENAI_DOMAIN = "openai-aca-$env:USERNAME-$random"
+$env:DEPLOYMENT_NAME = "gpt-5.4"
+```
+
+#### Step 2: Create Resource Group
+
+Create a resource group to contain all lab resources.
+
+```powershell
+az group create --name $env:RG --location $env:LOCATION
+```
+
+#### Step 3: Create Dynamic Session Pool
+
+Create a Dynamic Session Pool with Python runtime for secure, isolated code execution.
+
+```powershell
+az containerapp sessionpool create `
+   --name $env:POOL `
+   --resource-group $env:RG `
+   --location $env:LOCATION `
+   --container-type PythonLTS `
+   --max-sessions 50 `
+   --lifecycle-type Timed `
+   --cooldown-period 300 `
+   --network-status EgressEnabled
+```
+
+**What this does:**
+- Creates an isolated Python runtime pool (`PythonLTS`) for remote code execution sessions.
+- `--max-sessions 50`: Supports up to 50 concurrent code execution sessions.
+- `--cooldown-period 300`: Sessions remain available for 5 minutes after use.
+- `--network-status EgressEnabled`: Allows outbound internet access from session containers. Use `EgressDisabled` if you want stricter outbound network isolation.
+
+Get the pool management endpoint and resource ID for later configuration and RBAC.
+
+```powershell
+$poolInfo = az containerapp sessionpool show --name $env:POOL --resource-group $env:RG --query "{endpoint: managementEndpoint, resourceId: id}" -o json | ConvertFrom-Json
+$env:POOL_ENDPOINT = $poolInfo.endpoint
+$env:POOL_RESOURCE_ID = $poolInfo.resourceId
+```
+
+#### Step 4: Assign Session Pool Roles
+
+Grant your signed-in identity permissions on the session pool.
+
+```powershell
+az role assignment create `
+   --assignee-object-id $env:USER_OBJECT_ID `
+   --role "Azure Container Apps Session Executor" `
+   --scope $env:POOL_RESOURCE_ID
+
+az role assignment create `
+   --assignee-object-id $env:USER_OBJECT_ID `
+   --role "Contributor" `
+   --scope $env:POOL_RESOURCE_ID
+```
+
+**Roles explained:**
+- **Azure Container Apps Session Executor**: Allows creating and executing code in sessions.
+- **Contributor**: Allows managing the session pool resource.
+
+#### Step 5: Create Azure OpenAI Resource
+
+Provision Azure OpenAI in the same resource group.
+
+```powershell
+az cognitiveservices account create `
+   --name $env:OPENAI_NAME `
+   --resource-group $env:RG `
+   --kind OpenAI `
+   --sku S0 `
+   --location $env:LOCATION `
+   --custom-domain $env:OPENAI_DOMAIN
+```
+
+#### Step 6: Deploy Model
+
+Create the model deployment used by the sample application.
+
+```powershell
+az cognitiveservices account deployment create `
+   --name $env:OPENAI_NAME `
+   --resource-group $env:RG `
+   --deployment-name $env:DEPLOYMENT_NAME `
+   --model-name gpt-5.4 `
+   --model-version "1106" `
+   --model-format OpenAI `
+   --sku-capacity "30" `
+   --sku-name "Standard"
+```
+
+Retrieve endpoint and resource ID:
+
+```powershell
+$env:OPENAI_ENDPOINT = az cognitiveservices account show --name $env:OPENAI_NAME --resource-group $env:RG --query "properties.endpoint" -o tsv
+$env:OPENAI_ID = az cognitiveservices account show --name $env:OPENAI_NAME --resource-group $env:RG --query "id" -o tsv
+```
+
+#### Step 7: Assign Azure OpenAI Role
+
+Grant your identity OpenAI usage permissions via Azure AD.
+
+```powershell
+az role assignment create `
+   --assignee-object-id $env:USER_OBJECT_ID `
+   --role "Cognitive Services OpenAI User" `
+   --scope $env:OPENAI_ID
+```
+
+**Why this is needed:** This role allows your identity to make API calls to Azure OpenAI without requiring API keys (uses Azure AD authentication instead).
+
 
 ## MCP Shell Integration
 

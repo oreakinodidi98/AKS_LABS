@@ -1,0 +1,6 @@
+fastapi==0.111.0
+azure-identity==1.16.0
+python-dotenv==1.0.1
+llama-index==0.10.34
+llama-index-llms-azure-openai==0.1.7
+llama-index-tools-azure-code-interpreter==0.1.1
