@@ -58,20 +58,20 @@ provider "azurerm" {
 provider "azapi" {}
 provider "helm" {
   kubernetes = {
-    host                   = output.kube_host
-    username               = output.kube_username
-    password               = output.kube_password
-    client_certificate     = output.kube_client_certificate
-    client_key             = output.kube_client_key
-    cluster_ca_certificate = output.kube_cluster_ca_certificate
+    host                   = module.aks.kube_host
+    username               = module.aks.kube_username
+    password               = module.aks.kube_password
+    client_certificate     = module.aks.kube_client_certificate
+    client_key             = module.aks.kube_client_key
+    cluster_ca_certificate = module.aks.kube_cluster_ca_certificate
   }
 }
 provider "kubectl" {
-  host                   = output.kube_host
-  username               = output.kube_username
-  password               = output.kube_password
-  client_certificate     = output.kube_client_certificate
-  client_key             = output.kube_client_key
-  cluster_ca_certificate = output.kube_cluster_ca_certificate
+  host                   = module.aks.kube_host
+  username               = module.aks.kube_username
+  password               = module.aks.kube_password
+  client_certificate     = module.aks.kube_client_certificate
+  client_key             = module.aks.kube_client_key
+  cluster_ca_certificate = module.aks.kube_cluster_ca_certificate
   load_config_file       = false
 }

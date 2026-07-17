@@ -15,7 +15,7 @@ resource "random_string" "example" {
   length  = 4
   upper   = false
   lower   = true
-  number  = false
+  numeric = false
   special = false
 }
 
@@ -24,6 +24,8 @@ resource "azurerm_resource_group" "resourcegroup" {
   location = var.location
   tags     = local.tags
 }
+
+data "azurerm_client_config" "current" {}
 
 module "network" {
   source          = "./modules/network"
@@ -46,6 +48,8 @@ module "aks" {
   key_vault_id          = module.keyvault.key_vault_id
   ssh_public_key        = var.ssh_public_key
   aks_subnet_id         = module.network.CPU_subnet_id
+  gpu_subnet_id         = module.network.GPU_subnet_id
+  lustre_mgs_address    = module.network.lustre_mgs_address
   dns_prefix            = "${var.dns_prefix}${random_string.example.result}"
   aks_infrence_tempname = "${var.aks_infrence_tempname}${random_string.example.result}"
   depends_on            = [module.network]

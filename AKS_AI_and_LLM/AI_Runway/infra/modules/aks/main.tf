@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = "=1.19.0"
+    }
+  }
+}
+
 # get latest azure AKS latest Version
 data "azurerm_kubernetes_service_versions" "versions" {
     location = var.location
@@ -59,7 +68,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     min_count            = 3
     max_count            = 6
     temporary_name_for_rotation = "temppool"
-    auto_scaling_enabled = true
+      enable_auto_scaling  = true
     vm_size              = "Standard_D4d_v4"
     # Node taints for system pool
     only_critical_addons_enabled = true
@@ -190,7 +199,7 @@ resource "kubectl_manifest" "azurelustre_storageclass" {
     }
     provisioner = "azurelustre.csi.azure.com"
     parameters = {
-      "mgs-ip-address" = azurerm_managed_lustre_file_system.example.mgs_address
+      "mgs-ip-address" = var.lustre_mgs_address
     }
     reclaimPolicy     = "Retain"
     volumeBindingMode = "Immediate"
@@ -201,7 +210,6 @@ resource "kubectl_manifest" "azurelustre_storageclass" {
   })
   depends_on = [
     azurerm_kubernetes_cluster.aks_cluster,
-    azurerm_managed_lustre_file_system.example
   ]
 }
 
@@ -212,10 +220,8 @@ resource "azurerm_kubernetes_cluster_node_pool" "inference" {
   node_count                  = 1
   min_count                   = 1
   max_count                   = 1
-  auto_scaling_enabled        = true
-  gpu_driver                  = "None"
-  vnet_subnet_id              = azurerm_subnet.aks_inference.id
-  temporary_name_for_rotation = var.aks_infrence_tempname
+  enable_auto_scaling         = true
+  vnet_subnet_id              = var.gpu_subnet_id
 
   upgrade_settings {
     drain_timeout_in_minutes      = 0

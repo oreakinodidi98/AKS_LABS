@@ -25,6 +25,10 @@ variable "dns_prefix" {
 }
 variable "aks_subnet_id" {
 }
+variable "gpu_subnet_id" {
+}
+variable "lustre_mgs_address" {
+}
 variable "aks_infrence_tempname" {
   description = "Temporary name for the AKS inference node pool"
   type        = string
