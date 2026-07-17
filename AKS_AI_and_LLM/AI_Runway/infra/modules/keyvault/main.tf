@@ -14,9 +14,17 @@ resource "random_integer" "suffix" {
   min = 1000
   max = 9999
 }
+
+locals {
+  # Key Vault names must be 3-24 chars and contain only lowercase letters/numbers.
+  kv_name_sanitized = replace(replace(lower(var.kv_name), "-", ""), "_", "")
+  kv_name_base      = substr(local.kv_name_sanitized, 0, 18)
+  kv_name_final     = substr("${local.kv_name_base}${random_string.kv_suffix.result}", 0, 24)
+}
+
 # Azure Key Vault
 resource "azurerm_key_vault" "kv" {
-  name                        = "${var.kv_name}-kv-${random_string.kv_suffix.result}"
+  name                        = local.kv_name_final
   location                    = var.location
   resource_group_name         = var.resourcegroup
   enabled_for_disk_encryption = true
