@@ -75,7 +75,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     vnet_subnet_id = var.aks_subnet_id 
     node_labels         = {
       "nodepool" = "systempool"
-      "env"      = "AKS AI Runway"
+      "env"      = "aks-ai-runway"
     }
     upgrade_settings {
       drain_timeout_in_minutes      = 0
