@@ -168,6 +168,239 @@ The root application bootstraps the child applications for AI Runway, KAITO, Dyn
 
 ## Demo Summary
 
-This lab is about showing the full path from prototype to production for LLMs on AKS.
+This Demo is about showing the full path from prototype to production for LLMs on AKS.
 
 The important takeaway is that AI Runway gives you a single Kubernetes-native control plane for model deployment, while AKS, Terraform, and Argo CD handle the underlying platform and delivery workflow.
+
+## Demo 1: Deployment & Core Concepts
+
+In this demo, I will show you how to:
+
+- Deploy your first **ModelDeployment** from a manifest.
+- See how AI Runway separates what you want to run from how it gets run.
+- Identify the purpose of the **ModelDeployment** and **InferenceProviderConfig** CRDs.
+- Read deployment status conditions so you can see what the controller is doing.
+
+Start by creating your first AI Runway `ModelDeployment` resource. This manifest deploys a small CPU-based Gemma2 model. It intentionally leaves out the provider and engine so AI Runway can choose them automatically.
+
+```bash
+kubectl apply -f C:\AKS_LABS\AKS_AI_and_LLM\AI_Runway\demo_yaml\cpumodel.yaml
+```
+
+Expected output:
+
+```text
+modeldeployment.airunway.ai/gemma2-2b-cpu created
+```
+
+> [!NOTE]
+> This manifest includes `spec.image` because CPU-based models need a pre-built model server image. GPU-based models do not need this field because the provider handles image selection.
+
+Confirm that the resource exists:
+
+```bash
+kubectl get modeldeployment gemma2-2b-cpu
+```
+
+The deployment may not be ready yet. That is expected, because the controller is still working through its startup lifecycle.
+
+### How AI Runway works
+
+- AI Runway separates your **intent** from the **implementation**.
+- Your intent is the model, engine, and resources you want.
+- The implementation is the backend that actually runs it, plus the setup it needs.
+- You describe what you want in a `ModelDeployment`, and the controller handles provider selection, resource creation, and gateway routing.
+
+> [!NOTE]
+> Think of it like a universal remote: the `ModelDeployment` is the remote, and the provider is the device behind the TV that actually does the work.
+
+In simple terms, a provider is the part of the system that actually hosts and serves the model. AI Runway picks the provider for you based on the deployment you described, so you do not have to manage each backend manually.
+
+The resource you just created is a good example: one Kubernetes object represents the full model deployment, even though a provider is doing the actual work behind the scenes. In this demo, examples of providers include KAITO, NVIDIA Dynamo, KubeRay, and llm-d. AI Runway looks at your ModelDeployment and picks one of those backends to serve the model for you.
+
+### Architecture Overview
+
+AI Runway is split into three layers: the Kubernetes cluster, an optional backend API, and an optional UI.
+
+```mermaid
+graph TD
+    subgraph UI["UI Layer (optional)"]
+        ReactUI[React dashboard]
+        Headlamp[Headlamp plugin]
+        Kubectl[kubectl]
+        CustomUI[Any custom UI]
+    end
+
+    subgraph Backend["Backend API Layer (optional)"]
+        Hono[Hono REST API<br/>Proxies Kubernetes operations, model catalog, auth]
+    end
+
+    subgraph Cluster["Kubernetes Cluster"]
+        Core[AI Runway core controller<br/>Validates specs<br/>Selects provider<br/>Manages lifecycle]
+        CRDs[(CRDs<br/>ModelDeployment<br/>InferenceProviderConfig)]
+        Providers[Provider controllers<br/>KAITO · Dynamo · KubeRay · llm-d]
+        Pods[Inference pods<br/>GPU / CPU<br/>vLLM · llama.cpp · SGLang · TensorRT-LLM]
+    end
+
+    ReactUI & Headlamp & Kubectl & CustomUI -->|REST API JSON/HTTP| Hono
+    Hono -->|Kubernetes API| Core
+    Core --> Providers
+    Providers --> Pods
+    Core -.- CRDs
+```
+
+#### Key Design Points
+
+| Principle | What it means |
+| --- | --- |
+| Core controller is minimal | It validates specs, selects providers, manages routing, and updates status. |
+| Provider controllers are out-of-tree | Each provider has its own controller, so it can be versioned and released independently. |
+| UI is optional | You can use kubectl and CRDs directly; the web UI is only a convenience layer. |
+| Two-tier reconciliation | The core defines the interface, and providers implement it, similar to how CRI works in Kubernetes. |
+
+> [!NOTE]
+> Just like the kubelet talks to containerd through CRI and does not care whether you use containerd or CRI-O, the AI Runway core controller talks to providers through a standard interface. You can swap providers without changing your `ModelDeployment` specs.
+
+### The ModelDeployment CRD
+
+`ModelDeployment` is the main resource you work with in this demo. You describe what model you want and what resources it needs.
+
+The Gemma deployment you just applied asked for a Gemma2 2B model with 1 CPU. AI Runway handled the rest: it found a provider that supports CPU workloads, selected an engine, created the Kubernetes resources, and started managing the lifecycle.
+
+### Providers: The Inference Backends
+
+A provider is the backend that actually runs your model. In simple terms, AI Runway picks the engine and backend for you so you do not have to wire everything up by hand.
+
+Examples in this demo include:
+
+- **KAITO** (CNCF Sandbox): LLM inference, fine-tuning, and RAG on Kubernetes with GPU auto-provisioning and support for vLLM-compatible Hugging Face models.
+- **Dynamo** (NVIDIA): Distributed inference with disaggregated serving, smart KV cache routing, and dynamic GPU scheduling.
+- **KubeRay**: Kubernetes operator for Ray workloads such as RayCluster, RayJob, and RayService.
+- **llm-d** (CNCF Sandbox): Kubernetes-native distributed inference with LLM-aware routing, KV cache management, and multi-hardware support.
+
+You do not need to learn every provider's configuration format. You describe the outcome you want, and the controller chooses the provider that fits.
+
+### The InferenceProviderConfig CRD
+
+Each provider registers itself with the cluster through an `InferenceProviderConfig`. This tells AI Runway what the provider can do, including which engines it supports, whether it handles CPU or GPU workloads, and which serving modes it offers.
+
+Check the registered providers:
+
+```bash
+kubectl get inferenceproviderconfigs
+```
+
+Expected output:
+
+```text
+NAME      READY   VERSION                   AGE
+dynamo    true    dynamo-provider:v0.2.0    1h
+kaito     true    kaito-provider:v0.1.0     1h
+kuberay   true    kuberay-provider:v0.1.0   1h
+llmd      true    llmd-provider:v0.1.0      1h
+```
+
+You should see all four providers with `READY=true`. That confirms the controller knows which runtimes are available and healthy.
+
+To inspect a provider in more detail, run:
+
+```bash
+kubectl get inferenceproviderconfig kaito -o yaml
+```
+
+Expected output, with metadata removed for brevity:
+
+```yaml
+spec:
+  capabilities:
+    cpuSupport: true
+    engines:
+      - vllm
+      - llamacpp
+    gpuSupport: true
+    servingModes:
+      - aggregated
+  selectionRules:
+    - condition: "!has(spec.resources.gpu) || spec.resources.gpu.count == 0"
+      priority: 100
+    - condition: spec.engine.type == 'llamacpp'
+      priority: 100
+status:
+  ready: true
+  version: kaito-provider:v0.1.0
+```
+
+> [!NOTE]
+> The two parts to pay attention to are `spec.capabilities`, which tells you what the provider supports, and `selectionRules`, which tells you when it gets auto-selected. Because this demo asks for CPU, the controller should pick KAITO with the llama.cpp engine.
+
+### Watch The Deployment Status
+
+Now check what the controller decided for the Gemma deployment:
+
+```bash
+kubectl get modeldeployment gemma2-2b-cpu -o yaml | yq '.status'
+```
+
+You should see conditions similar to these:
+
+```yaml
+conditions:
+  - message: Engine llamacpp auto-selected from provider kaito
+    status: "True"
+    type: EngineSelected
+  - message: Provider kaito auto-selected
+    status: "True"
+    type: ProviderSelected
+  - message: Workspace created successfully
+    status: "True"
+    type: ResourceCreated
+  - message: All replicas are ready
+    status: "True"
+    type: Ready
+  - message: InferencePool and HTTPRoute created
+    status: "True"
+    type: GatewayReady
+engine:
+  type: llamacpp
+phase: Running
+provider:
+  name: kaito
+  resourceKind: Workspace
+  selectedReason: "matched capabilities: engine=llamacpp, gpu=false, mode=aggregated"
+replicas:
+  available: 1
+  desired: 1
+  ready: 1
+```
+
+> [!TIP]
+> Read `status.conditions` from top to bottom. They tell the story of the deployment: validation, provider selection, resource creation, readiness, and gateway setup. If traffic is not flowing, this is the first place to check.
+
+### Test The Model Endpoint
+
+The model exposes an OpenAI-compatible API. For this demo, use `kubectl port-forward` to test it directly.
+
+In a new terminal tab, start a port-forward to the KAITO workspace service:
+
+```bash
+kubectl port-forward svc/gemma2-2b-cpu 8080:80
+```
+
+In another terminal tab, send a chat request:
+
+```bash
+curl -s http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemma-2-2b-instruct",
+    "messages": [{"role": "user", "content": "What are the advantages and disadvantages of running models on Kubernetes?"}],
+    "max_tokens": 50
+  }' | jq
+```
+
+You should see a JSON response with the model reply. That confirms the model is running and serving an OpenAI-compatible API.
+
+> [!NOTE]
+> Later in the demo, you will see how the Gateway API Inference Extension routes traffic to multiple models through a single shared endpoint.
+
+When you are done, press **Ctrl+C** in the port-forward terminal to stop it. You can close the extra terminal tab.
