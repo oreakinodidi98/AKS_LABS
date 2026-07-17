@@ -1,67 +1,72 @@
-# AKS_LLMS_prototype_to_prod : Take LLMs from prototype to production on AKS
+# AKS LLMs: Prototype to Production on AKS
 
-This is demo with notes on how you can Take LLMs from prototype to production on AKS.
+This demo shows how to take an LLM from experiment to production on Azure Kubernetes Service (AKS) with AI Runway.
 
-Moving an AI model from experiment to production is hard.
+The goal is to keep the path easy to follow: provision the cluster, connect to it, and then let AI Runway handle model deployment, routing, and operational concerns across multiple inference backends.
 
-- This demo will teach users more about AI Runway, an open-source accelerator that simplifies deploying LLMs on Azure Kubernetes Service (AKS).
-- By treating models as native Kubernetes resources, AI Runway offers a single interface that adapts to multiple inference backends. 
-- Users will deploy a production LLM on AKS, implement custom resources for scaling and networking, configure GPU and latency monitoring, and integrate it into CI/CD pipelines.
+## Demo Goal
 
-## AI Runway
+By the end of this demo, you should understand how to:
 
-AI Runway is an open-source project that treats model deployments as native Kubernetes resources. It gives you a single interface that works across multiple inference backends.
-- In this demo, we will deploy large language models (LLMs) on Azure Kubernetes Service (AKS) using both CPU and GPU nodes, configure production serving patterns, set up monitoring, and manage everything through GitOps with Argo CD.
+- Deploy an LLM on AKS using CPU and GPU node pools.
+- Use AI Runway as a single interface for multiple inference backends.
+- Add production-style routing, scaling, and monitoring.
+- Manage the platform through GitOps with Argo CD.
 
-## Why AI Runway?
+## What AI Runway Does
 
-Deploying LLMs in production means working with multiple inference providers, each with its own configuration format. AI Runway simplifies this with:
+AI Runway is an open-source project that treats model deployments as native Kubernetes resources.
 
-- **One interface for all providers**: Describe _what_ you want to deploy (model, engine, resources) and AI Runway figures out _how_.
-- **Less operational overhead**: AI/ML teams focus on models, not infrastructure details.
-- **Automatic provider and engine selection**: The controller picks the right inference provider and engine based on your spec.
-- **Production patterns built in**: GitOps workflows, monitoring, and scalable deployment are supported out of the box.
+In practice, that means you describe what you want to run, and the controller handles the provider-specific work behind the scenes.
 
-The table below compares the traditional approach to deploying models on Kubernetes with the AI Runway approach:
+### Why Use It
 
-| Without AI Runway                                                                                                 | With AI Runway                                                        |
-| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Learn each provider's CRDs and configuration (KAITO Workspaces, Dynamo DynamoGraphDeployments, RayServices, etc.) | One ModelDeployment CustomResourceDefinition (CRD) for all providers  |
-| Manually match models to the right provider and engine                                                            | Auto-selects provider and engine based on your spec                   |
-| Configure gateway routing (InferencePool, HTTPRoute, EPP) per model                                               | Gateway resources created and cleaned up automatically                |
-| Separate monitoring and status tracking per provider                                                              | Unified status conditions and Prometheus metrics across all providers |
-| Write provider-specific YAML for each new deployment                                                              | Describe what you want; the controller handles how                    |
+- One interface for multiple providers.
+- Less infrastructure work for AI teams.
+- Automatic provider and engine selection based on the spec.
+- Built-in support for GitOps, monitoring, and scalable deployment patterns.
+
+### Compared With The Traditional Approach
+
+| Without AI Runway | With AI Runway |
+| --- | --- |
+| Learn each provider's CRDs and configuration separately | Use one `ModelDeployment` CRD across providers |
+| Manually match models to the right backend and engine | Let the controller select the backend and engine |
+| Configure routing resources for each model by hand | Create gateway resources automatically |
+| Track status per provider in different ways | Use unified status conditions and Prometheus metrics |
+| Write provider-specific YAML for every deployment | Describe the desired outcome and let the controller handle the rest |
 
 > [!NOTE]
-> AI Runway doesn't replace inference providers. It sits on top of them and gives you one interface for all of them.
+> AI Runway does not replace inference providers. It sits above them and gives you one consistent interface.
 
+## Prerequisites
 
-## required tools
+Make sure these tools are available before you start the demo:
 
-| Tool                                                                      | Purpose                                                             |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)      | Manage Azure resources and AKS credentials                          |
-| [kubectl](https://kubernetes.io/docs/tasks/tools/)                        | Interact with Kubernetes clusters                                   |
-| [Bun](https://bun.sh)                                                     | Run the AI Runway dashboard (frontend + backend)                    |
-| [Helm](https://helm.sh/docs/intro/install/)                               | Used by the dashboard for runtime installation                      |
-| [jq](https://jqlang.org/)                                                 | Parse JSON output from kubectl and curl                             |
-| [yq](https://github.com/mikefarah/yq)                                     | Parse YAML output from kubectl                                      |
-| [Git](https://git-scm.com/)                                               | Clone the AI Runway repository                                      |
-| [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/) | Optional GitOps tooling to check on Argo CD application deployments |
-| [GitHub Copilot CLI](https://github.com/features/copilot/cli/)            | GitHub-native terminal agent (requires version 1.0.44 or higher)    |
-| [Visual Studio Code (VS Code)](https://code.visualstudio.com/download)    | Open source code editor (requires version 1.120.0 or higher)        |
+| Tool | Purpose |
+| --- | --- |
+| [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) | Manage Azure resources and AKS credentials |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | Work with the Kubernetes cluster |
+| [Bun](https://bun.sh) | Run the AI Runway dashboard |
+| [Helm](https://helm.sh/docs/intro/install/) | Install supporting components |
+| [jq](https://jqlang.org/) | Parse JSON output from `kubectl` and `curl` |
+| [yq](https://github.com/mikefarah/yq) | Parse YAML output from `kubectl` |
+| [Git](https://git-scm.com/) | Clone and manage the repository |
+| [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/) | Optional GitOps checks |
+| [GitHub Copilot CLI](https://github.com/features/copilot/cli/) | Optional terminal assistant, version 1.0.44 or later |
+| [Visual Studio Code](https://code.visualstudio.com/download) | Recommended editor, version 1.120.0 or later |
 
-### Infrastructure setup
+## Provision The Infrastructure
 
-You can provision the necessary infrastructure using the Terraform configuration in this repository.
+This repository includes Terraform that provisions the demo environment.
 
-Start by opening a terminal and log in to your Azure account:
+Start with Azure authentication:
 
 ```bash
 az login
 ```
 
-Clone this repo, then navigate to the Terraform directory and apply the configuration:
+Then move into the infrastructure folder and apply the configuration:
 
 ```bash
 cd src/infra
@@ -69,41 +74,46 @@ terraform init
 terraform apply
 ```
 
-This creates a resource group, an AKS cluster (with CPU and GPU node pools), Azure Managed Lustre storage, and bootstraps the AI Runway application components via Argo CD.
+This creates:
 
-Here is a high-level architecture diagram of the deployed infrastructure and applications:
+- A resource group.
+- An AKS cluster with CPU and GPU node pools.
+- Azure Managed Lustre storage.
+- The application platform bootstrap through Argo CD.
+
+## High-Level Architecture
 
 ```mermaid
 graph LR
     subgraph Azure["Azure Resources"]
         VNet["Virtual Network · 10.21.0.0/16"]
-        AKS["AKS Cluster · K8s 1.35+"]
+        AKS["AKS Cluster · Kubernetes 1.35+"]
         Lustre["Azure Managed Lustre · 4 TB<br/>10.21.1.0/24"]
-        InferenceNP["GPU Node Pool<br/>Standard_NC48ads_A100_v4 · 1 node<br/>10.21.3.0/24"]
-        DefaultNP["CPU Node Pool<br/>Standard_D4d_v4 · 3-6 nodes<br/>10.21.2.0/24"]
+        GPUNodePool["GPU Node Pool<br/>Standard_NC48ads_A100_v4 · 1 node<br/>10.21.3.0/24"]
+        CPUNodePool["CPU Node Pool<br/>Standard_D4d_v4 · 3-6 nodes<br/>10.21.2.0/24"]
     end
 
-    subgraph Installed["Helm Releases"]
+    subgraph Installed["Installed Components"]
         GPU["NVIDIA GPU Operator"]
         Istio["Istio + Gateway API"]
-        Prom["Prometheus"]
+        Prometheus["Prometheus"]
         ArgoCD["Argo CD"]
     end
 
     subgraph Apps["Argo CD App-of-Apps"]
-        GW["Gateway API CRDs +<br/>Inference Extension +<br/>Body-Based Routing"]
+        Gateway["Gateway API CRDs +<br/>Inference Extension +<br/>Body-Based Routing"]
         AIRunway["AI Runway Controller + Providers + Monitors"]
         KAITO["KAITO"]
         Dynamo["NVIDIA Dynamo"]
-        llm-d[llm-d]
+        LLMd["llm-d"]
         LustreCSI["Lustre CSI Driver"]
         KubeRay["KubeRay"]
     end
 
     VNet --- AKS
     VNet --- Lustre
-    AKS --> DefaultNP
-    AKS --> InferenceNP
+    AKS --> CPUNodePool
+    AKS --> GPUNodePool
 
     AKS ==> Installed
     ArgoCD ==> Apps
@@ -111,34 +121,53 @@ graph LR
     AIRunway -.->|orchestrates| KAITO
     AIRunway -.->|orchestrates| Dynamo
     AIRunway -.->|orchestrates| KubeRay
-    AIRunway -.->|orchestrates| llm-d
-    AIRunway -.->|routes via| GW
+    AIRunway -.->|orchestrates| LLMd
+    AIRunway -.->|routes via| Gateway
     Dynamo <-.->|model cache| LustreCSI
 ```
 
-> [!NOTE] More details on the infrastructure and application architecture can be found in [Appendix B: Reproduce This Lab in Your Own Environment](appendix-b.md).
+## Connect To The Cluster
 
-Once complete, grab the outputs and connect to the cluster:
+After Terraform finishes, capture the outputs and request credentials:
 
 ```bash
 RG_NAME=$(terraform output -raw rg_name)
-AKS_NAME=$(terraform output -raw aks_name)
+AKS_NAME=$(terraform output -raw aks_cluster_name)
 
 az aks get-credentials \
---resource-group $RG_NAME \
---name $AKS_NAME \
---overwrite
+  --resource-group $RG_NAME \
+  --name $AKS_NAME \
+  --overwrite
 ```
 
 > [!NOTE]
-> The Terraform configuration requires an Azure subscription with GPU quota (Standard_NC48ads_A100_v4). Request quota increases in advance — GPU quota approvals can take time.
+> This demo requires Azure quota for the GPU VM SKU `Standard_NC48ads_A100_v4`. Request quota increases early, because approval can take time.
 
-Verify the connection:
+Verify that the cluster connection works:
 
 ```bash
 kubectl cluster-info
 ```
 
-You should see the Kubernetes control plane and CoreDNS endpoints listed, confirming a successful connection to the cluster.
+If everything is wired up correctly, you should see the Kubernetes control plane and CoreDNS endpoints.
 
----
+## How The Demo Is Organized
+
+Think of the demo in two layers:
+
+1. Terraform builds the base Azure and AKS environment.
+2. Argo CD applies the app-of-apps pattern and installs the AI Runway stack plus its supporting components.
+
+That means the infrastructure is created first, then the Kubernetes workloads are layered on top during cluster provisioning.
+
+## Notes On The Manifests
+
+The manifests in this demo are managed by Argo CD using an app-of-apps pattern.
+
+The root application bootstraps the child applications for AI Runway, KAITO, Dynamo, Gateway API, KubeRay, and the Lustre CSI driver. Those workloads are applied automatically during cluster provisioning, and the workshop modules reference the individual manifests when you need to make changes.
+
+## Demo Summary
+
+This lab is about showing the full path from prototype to production for LLMs on AKS.
+
+The important takeaway is that AI Runway gives you a single Kubernetes-native control plane for model deployment, while AKS, Terraform, and Argo CD handle the underlying platform and delivery workflow.
