@@ -149,7 +149,7 @@ roleRef:
   name: airunway-hf-secret
 subjects:
 - kind: ServiceAccount
-  name: airunway
+  name: airunway-dynamo-provider
   namespace: airunway-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
