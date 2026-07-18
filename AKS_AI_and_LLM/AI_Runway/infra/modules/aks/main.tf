@@ -19,12 +19,12 @@ resource "azurerm_user_assigned_identity" "aks_cluster" {
   location            = var.location
   resource_group_name = var.resourcegroup
 }
-#create role assighnment at RG scope with managed identity
-resource "azurerm_role_assignment" "role_rg" {
-  scope                = var.resourcegroup_id
-  role_definition_name = "Network Contributor"
-  principal_id         = azurerm_user_assigned_identity.aks_cluster.principal_id
-}
+# #create role assighnment at RG scope with managed identity
+# resource "azurerm_role_assignment" "role_rg" {
+#   scope                = var.resourcegroup_id
+#   role_definition_name = "Network Contributor"
+#   principal_id         = azurerm_user_assigned_identity.aks_cluster.principal_id
+# }
 # create role assignment at subscription scope with managed identity
 resource "azurerm_role_assignment" "contributor_role_assignment" {
   scope                = data.azurerm_subscription.current.id

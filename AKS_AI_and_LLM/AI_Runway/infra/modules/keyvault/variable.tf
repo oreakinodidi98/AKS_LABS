@@ -26,11 +26,6 @@ variable "object_id" {
   type        = string
 }
 
-variable "backend_identity_principal_id" {
-  description = "Principal ID of the backend managed identity"
-  type        = string
-  default     = null
-}
 variable "identity_prefix" {
   description = "Prefix for the managed identity name"
   type        = string

@@ -7,7 +7,7 @@ variable "resourcegroup" {
 variable "location" {
   description = "value for location"
   type        = string
-  default     = "swedencentral"
+  default     = "uksouth"
 }
 variable "tags" {
   description = "A map of tags to add to all resources"
