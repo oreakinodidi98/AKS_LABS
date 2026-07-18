@@ -153,6 +153,9 @@ resource "helm_release" "argo_cd" {
   version          = "9.5.4"
   namespace        = "argocd"
   create_namespace = true
+  wait             = true
+  timeout          = 1800
+  cleanup_on_fail  = true
 }
 
 resource "kubectl_manifest" "argo_cd_app" {
