@@ -3,7 +3,3 @@ kind: Kustomization
 resources:
 - controller.yaml
 - prometheus.yaml
-images:
-- name: ghcr.io/kaito-project/airunway/controller
-  newName: ghcr.io/oreakin/airunway/controller
-  newTag: 849c487

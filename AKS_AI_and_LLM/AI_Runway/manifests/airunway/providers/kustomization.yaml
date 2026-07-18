@@ -9,17 +9,4 @@ resources:
 - kuberay-podmonitor.yaml
 - llmd.yaml
 - llmd-podmonitor.yaml
-images:
-- name: ghcr.io/kaito-project/airunway/dynamo-provider
-  newName: ghcr.io/oreakin/airunway/dynamo-provider
-  newTag: dceff79
-- name: ghcr.io/kaito-project/airunway/kaito-provider
-  newName: ghcr.io/oreakin/airunway/kaito-provider
-  newTag: 849c487
-- name: ghcr.io/kaito-project/airunway/kuberay-provider
-  newName: ghcr.io/oreakin/airunway/kuberay-provider
-  newTag: dev-1779594281
-- name: ghcr.io/kaito-project/airunway/llmd-provider
-  newName: ghcr.io/oreakin/airunway/llmd-provider
-  newTag: 849c487
 
