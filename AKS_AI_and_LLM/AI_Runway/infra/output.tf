@@ -26,21 +26,27 @@ output "acr_login_server" {
   value       = module.aks.acr_login_server
 }
 output "kube_host" {
+  sensitive = true
   value = module.aks.kube_host
 }
 output "kube_username" {
+  sensitive = true
   value = module.aks.kube_username
 }
 output "kube_password" {
+  sensitive = true
   value = module.aks.kube_password
 }
 output "kube_client_certificate" {
+  sensitive = true
   value = module.aks.kube_client_certificate
 }
 output "kube_client_key" {
+  sensitive = true
   value = module.aks.kube_client_key
 }
 output "kube_cluster_ca_certificate" {
+  sensitive = true
   value = module.aks.kube_cluster_ca_certificate
 }
 # -----------------------------------------------------------------------------
