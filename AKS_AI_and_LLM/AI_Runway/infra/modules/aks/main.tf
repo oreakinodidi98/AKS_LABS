@@ -117,6 +117,10 @@ resource "helm_release" "nvidia_gpu_operator" {
   version          = "v26.3.1"
   namespace        = "gpu-operator"
   create_namespace = true
+  wait             = true
+  timeout          = 1800
+  atomic           = true
+  cleanup_on_fail  = true
 }
 
 resource "helm_release" "istio_base" {
@@ -135,6 +139,10 @@ resource "helm_release" "istiod" {
   version          = "1.29.2"
   namespace        = "istio-system"
   create_namespace = false
+  wait             = true
+  timeout          = 1800
+  atomic           = true
+  cleanup_on_fail  = true
 
   set = [
     {
@@ -155,6 +163,7 @@ resource "helm_release" "argo_cd" {
   create_namespace = true
   wait             = true
   timeout          = 1800
+  atomic           = true
   cleanup_on_fail  = true
 }
 
