@@ -119,8 +119,10 @@ resource "helm_release" "nvidia_gpu_operator" {
   create_namespace = true
   wait             = true
   timeout          = 1800
-  atomic           = true
-  cleanup_on_fail  = true
+  atomic           = false
+  cleanup_on_fail  = false
+
+  depends_on = [azurerm_kubernetes_cluster_node_pool.inference]
 }
 
 resource "helm_release" "istio_base" {
@@ -141,8 +143,8 @@ resource "helm_release" "istiod" {
   create_namespace = false
   wait             = true
   timeout          = 1800
-  atomic           = true
-  cleanup_on_fail  = true
+  atomic           = false
+  cleanup_on_fail  = false
 
   set = [
     {
@@ -163,8 +165,8 @@ resource "helm_release" "argo_cd" {
   create_namespace = true
   wait             = true
   timeout          = 1800
-  atomic           = true
-  cleanup_on_fail  = true
+  atomic           = false
+  cleanup_on_fail  = false
 }
 
 resource "kubectl_manifest" "argo_cd_app" {
@@ -242,11 +244,6 @@ resource "azurerm_kubernetes_cluster_node_pool" "inference" {
   }
 
   depends_on = [
-    azurerm_kubernetes_cluster.aks_cluster,
-    helm_release.nvidia_gpu_operator,
-    helm_release.istio_base,
-    helm_release.istiod,
-    helm_release.argo_cd,
-    kubectl_manifest.argo_cd_app
+    azurerm_kubernetes_cluster.aks_cluster
   ]
 }
