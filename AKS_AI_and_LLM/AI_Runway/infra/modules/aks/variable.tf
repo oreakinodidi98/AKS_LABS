@@ -1,5 +1,10 @@
 variable "location" {
 }
+variable "enable_gpu_inference_pool" {
+  description = "Whether to deploy the GPU inference node pool and GPU operator"
+  type        = bool
+  default     = true
+}
 variable "resourcegroup" {
 }
 variable "resourcegroup_id" {

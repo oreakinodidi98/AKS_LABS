@@ -57,6 +57,11 @@ variable "aks_infrence_tempname" {
   type        = string
   default     = "temp"
 }
+variable "enable_gpu_inference_pool" {
+  description = "Whether to deploy the GPU inference node pool and GPU operator"
+  type        = bool
+  default     = true
+}
 #################### Logs Variables ####################
 variable "env_name" {
   description = "Name of Environment"

@@ -40,6 +40,7 @@ module "aks" {
   source                = "./modules/aks"
   resourcegroup         = azurerm_resource_group.resourcegroup.name
   location              = var.location
+  enable_gpu_inference_pool = var.enable_gpu_inference_pool
   aks_cluster_name      = var.aks_cluster_name
   acr_name              = var.acr_name
   log_analytics_id      = module.monitoring.azurerm_log_analytics_workspace_id

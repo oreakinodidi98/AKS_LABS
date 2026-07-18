@@ -111,6 +111,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 }
 
 resource "helm_release" "nvidia_gpu_operator" {
+  count            = var.enable_gpu_inference_pool ? 1 : 0
   name             = "gpu-operator"
   repository       = "https://helm.ngc.nvidia.com/nvidia"
   chart            = "gpu-operator"
@@ -228,6 +229,7 @@ resource "kubectl_manifest" "azurelustre_storageclass" {
 }
 
 resource "azurerm_kubernetes_cluster_node_pool" "inference" {
+  count                       = var.enable_gpu_inference_pool ? 1 : 0
   name                        = "inference"
   kubernetes_cluster_id       = azurerm_kubernetes_cluster.aks_cluster.id
   vm_size                     = "Standard_NC48ads_A100_v4"
