@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: airunway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - name: controller
+      repoURL: https://github.com/oreakinodidi98/AKS_LABS.git
+      targetRevision: HEAD
+      path: AKS_AI_and_LLM/AI_Runway/manifests/airunway/controller
+    - name: providers
+      repoURL: https://github.com/oreakinodidi98/AKS_LABS.git
+      targetRevision: HEAD
+      path: AKS_AI_and_LLM/AI_Runway/manifests/airunway/providers
+    - name: gateway
+      repoURL: https://github.com/oreakinodidi98/AKS_LABS.git
+      targetRevision: HEAD
+      path: AKS_AI_and_LLM/AI_Runway/manifests/airunway/gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  ignoreDifferences:
+    - kind: Secret
+      name: airunway-webhook-server-cert
+      namespace: airunway-system
+      jsonPointers:
+        - /data
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: airunway-mutating-webhook-configuration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: airunway-validating-webhook-configuration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

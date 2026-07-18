@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kaito
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://kaito-project.github.io/kaito/charts/kaito
+    chart: workspace
+    targetRevision: 0.10.0
+    helm:
+      skipCrds: true
+      releaseName: kaito-workspace
+      valuesObject:
+        featureGates:
+          disableNodeAutoProvisioning: true
+        nvidiaDevicePlugin:
+          enabled: false
+        localCSIDriver:
+          useLocalCSIDriver: false
+        gpu-feature-discovery:
+          gfd:
+            enabled: false
+          nfd:
+            enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kaito-workspace
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: workspace-webhook-cert
+      namespace: kaito-workspace
+      jsonPointers:
+        - /data
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: validation.workspace.kaito.sh
+      jqPathExpressions:
+        - .webhooks[].rules
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

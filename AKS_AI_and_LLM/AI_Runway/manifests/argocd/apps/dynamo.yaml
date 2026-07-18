@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dynamo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://helm.ngc.nvidia.com/nvidia/ai-dynamo
+    chart: dynamo-platform
+    targetRevision: 1.0.2
+    helm:
+      releaseName: dynamo-platform
+      valuesObject:
+        global:
+          grove:
+            install: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dynamo-system
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: grove-webhook-server-cert
+      namespace: dynamo-system
+      jsonPointers:
+        - /data
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/versions
+    - group: apps
+      kind: StatefulSet
+      name: dynamo-platform-nats
+      namespace: dynamo-system
+      jsonPointers:
+        - /spec/volumeClaimTemplates
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: podcliqueset-defaulting-webhook
+      jsonPointers:
+        - /webhooks
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: podcliqueset-validating-webhook
+      jsonPointers:
+        - /webhooks
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
