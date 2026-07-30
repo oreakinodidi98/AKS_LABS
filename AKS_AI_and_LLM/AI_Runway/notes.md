@@ -514,4 +514,13 @@ The gateway should show **PROGRAMMED: True** with an external IP. All controller
 
 ## Demo 3: GPU Auto-Selection & Validation
 
-This demo will show you how to deploy a GPU model with a minimal manifest, verify AI Runway auto-selects Dynamo and vLLM , compare GPU vs CPU inference speed
+This demo will show you how to deploy a GPU model with a minimal manifest, verify AI Runway auto-selects Dynamo and vLLM , compare GPU vs CPU inference speed and explain how the gateway routes requests to different models. The CPU model covered the basic flow. Now you'll deploy a GPU model with a minimal manifest and watch AI Runway pick the right runtime
+
+### Deploy a Small GPU Model
+
+kubectl apply -f C:\AKS_LABS\AKS_AI_and_LLM\AI_Runway\manifests\smallgpumodel.yaml
+
+By requesting **spec.resources.gpu.count: 1**, the controller auto-selects **Dynamo** as the provider and **vLLM** as the engine
+
+> [!TIP]
+> This small **0.6B** model keeps deployment times short.

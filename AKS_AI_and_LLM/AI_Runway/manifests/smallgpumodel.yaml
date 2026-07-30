@@ -1,0 +1,11 @@
+apiVersion: airunway.ai/v1alpha1
+kind: ModelDeployment
+metadata:
+  name: qwen3-gpu
+spec:
+  model:
+    id: Qwen/Qwen3-0.6B
+    source: huggingface
+  resources:
+    gpu:
+      count: 1
