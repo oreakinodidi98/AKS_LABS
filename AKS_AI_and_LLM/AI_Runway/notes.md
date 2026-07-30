@@ -137,7 +137,7 @@ AKS_NAME=$(terraform output -raw aks_cluster_name)
 az aks get-credentials \
   --resource-group $RG_NAME \
   --name $AKS_NAME \
-  --overwrite
+  --overwrite-existing
 ```
 
 > [!NOTE]
@@ -164,11 +164,11 @@ That means the infrastructure is created first, then the Kubernetes workloads ar
 
 The manifests in this demo are managed by Argo CD using an app-of-apps pattern.
 
-The root application bootstraps the child applications for AI Runway, KAITO, Dynamo, Gateway API, KubeRay, and the Lustre CSI driver. Those workloads are applied automatically during cluster provisioning, and the workshop modules reference the individual manifests when you need to make changes.
+The root application bootstraps the child applications for AI Runway, KAITO, Dynamo, Gateway API, KubeRay, and the Lustre CSI driver. Those workloads are applied automatically during cluster provisioning, and the demos reference the individual manifests when you need to make changes.
 
 ## Demo Summary
 
-This Demo is about showing the full path from prototype to production for LLMs on AKS.
+This demo walks the full path from prototype to production for LLMs on AKS.
 
 The important takeaway is that AI Runway gives you a single Kubernetes-native control plane for model deployment, while AKS, Terraform, and Argo CD handle the underlying platform and delivery workflow.
 
@@ -214,9 +214,9 @@ The deployment may not be ready yet. That is expected, because the controller is
 > [!NOTE]
 > Think of it like a universal remote: the `ModelDeployment` is the remote, and the provider is the device behind the TV that actually does the work.
 
-In simple terms, a provider is the part of the system that actually hosts and serves the model. AI Runway picks the provider for you based on the deployment you described, so you do not have to manage each backend manually.
+In simple terms, a provider is the part of the system that actually hosts and serves the model. AI Runway picks the right provider based on your deployment spec, so you do not need to manage each backend manually.
 
-The resource you just created is a good example: one Kubernetes object represents the full model deployment, even though a provider is doing the actual work behind the scenes. In this demo, examples of providers include KAITO, NVIDIA Dynamo, KubeRay, and llm-d. AI Runway looks at your ModelDeployment and picks one of those backends to serve the model for you.
+The resource you just created is a good example of this separation. One Kubernetes object captures your full deployment intent, while the provider handles the actual work behind the scenes. The available providers in this demo are KAITO, NVIDIA Dynamo, KubeRay, and llm-d — and the controller chose one for you automatically.
 
 ### Architecture Overview
 
@@ -269,7 +269,7 @@ The Gemma deployment you just applied asked for a Gemma2 2B model with 1 CPU. AI
 
 ### Providers: The Inference Backends
 
-A provider is the backend that actually runs your model. In simple terms, AI Runway picks the engine and backend for you so you do not have to wire everything up by hand.
+A provider is the backend that runs your model. Each one has different strengths, and AI Runway selects the right one automatically based on what your deployment spec requires.
 
 Examples in this demo include:
 
@@ -405,18 +405,16 @@ You should see a JSON response with the model reply. That confirms the model is 
 
 When you are done, press **Ctrl+C** in the port-forward terminal to stop it. You can close the extra terminal tab.
 
-## Demo 2: Cluster Verification and Dashboar
+## Demo 2: Cluster Verification and Dashboard
 
-This demo will show you how to launch the AI Runway web dashboard and inspect your live deployment, verify our AKS cluster has GPU resources available and make sure the infrence gateway and AI runway components are ready
+This demo shows you how to launch the AI Runway dashboard and inspect your live deployment. You will also verify that the AKS cluster has GPU resources available and confirm that the inference gateway and AI Runway components are healthy.
 
 
-### AI runway dashboard
+### AI Runway Dashboard
 
-The AI runway Dashboard allows for teams to visualise available models, cluster health and deployment status. This is usefull for onboarding and incident triage providing a quick overview of enviroment. This is an optional web interface for visualising and managing deployments. This dashboard can run locally during dev or deployed in a cluster for shared team acess.
+The AI Runway dashboard gives teams a visual overview of available models, cluster health, and deployment status. It is useful during onboarding and incident triage when you need a quick snapshot of the environment without running kubectl. It is optional — you can run it locally during development or deploy it into the cluster for shared team access.
 
-To run locally :
-
-Clone the dashboard repository and open the repository in VS Code 
+To run locally:
 
 ```bash
 cd ~ && git clone --branch v0.6.0 https://github.com/kaito-project/airunway.git
@@ -432,7 +430,7 @@ bun install
 ```
 
 > [!NOTE]
-> Bun on Windows does not yet support `&` for parallel background processes, so run the backend and frontend in two separate terminals. We will keep this tab open throughout the workshop.
+> Bun on Windows does not yet support `&` for parallel background processes, so run the backend and frontend in two separate terminals.
 
 **Terminal 1 – Backend (port 3001):**
 
@@ -472,7 +470,7 @@ Click **Settings** in the left sidebar. The Settings page has three tabs that gi
 
 ### Browse the Model Catalog
 
-Click **Models** in the left sidebar. This page is a catalog of models organized by engine compatibility. Each card shows the model name, parameter count, required GPU memory, and supported inference engines (vLLM, SGLang, TensorRT-LLM, llama.cpp). The **Deploy →** button on each card opens a guided deployment flow where you pick a runtime, engine, and resource allocation. In this workshop, we use kubectl manifests instead so you can see auto-selection at work.
+Click **Models** in the left sidebar. This page is a catalog of models organized by engine compatibility. Each card shows the model name, parameter count, required GPU memory, and supported inference engines (vLLM, SGLang, TensorRT-LLM, llama.cpp). The **Deploy →** button on each card opens a guided deployment flow where you pick a runtime, engine, and resource allocation. In this demo, we use kubectl manifests directly so you can see auto-selection at work.
 
 ![Model catalog page showing curated models with engine tags and Deploy buttons](image/notes/1785452693940.png)
 
@@ -484,10 +482,10 @@ Now let's verify the cluster itself using the CLI. Open a new terminal tab and r
 kubectl get nodes -o wide
 ```
 
-You should see at least 3 nodes with **default** in the name (CPU pool) and 1 node with **inference** in the name (GPU pool). This is dependent on what settings you used to deploy the terraform configuration
+You should see at least 3 nodes with **default** in the name (CPU pool) and 1 node with **inference** in the name (GPU pool). The exact count depends on the Terraform configuration you applied.
 
 > [!TIP]
-> Skip this section if you do not have GPU ndes available on your account
+> Skip this section if you do not have GPU nodes available on your account.
 > 
 Check the GPU resources available:
 
@@ -510,17 +508,19 @@ kubectl get pods -n airunway-system
 The gateway should show **PROGRAMMED: True** with an external IP. All controller pods should be **Running**.
 
 > [!NOTE]
-> **Gateway API Inference Extension** extends the standard Gateway API for AI/ML workloads. It adds inference-aware routing and load balancing through components like InferencePool, Endpoint Picker Proxy (EPP), Body-Based Router (BBR), and HTTPRoute. AI Runway creates all of these automatically for each ModelDeployment that has gateway enabled. You'll see how the routing works in detail in Module 3.
+> **Gateway API Inference Extension** extends the standard Gateway API for AI/ML workloads. It adds inference-aware routing and load balancing through components like InferencePool, Endpoint Picker Proxy (EPP), Body-Based Router (BBR), and HTTPRoute. AI Runway creates all of these automatically for each ModelDeployment that has gateway enabled. You will see how the routing works in detail in Demo 3.
 
 ## Demo 3: GPU Auto-Selection & Validation
 
-This demo will show you how to deploy a GPU model with a minimal manifest, verify AI Runway auto-selects Dynamo and vLLM , compare GPU vs CPU inference speed and explain how the gateway routes requests to different models. The CPU model covered the basic flow. Now you'll deploy a GPU model with a minimal manifest and watch AI Runway pick the right runtime
+This demo shows you how to deploy a GPU model with a minimal manifest. You will see AI Runway auto-select Dynamo and vLLM, compare GPU versus CPU inference speed, and understand how the gateway routes requests across models. Demo 1 covered the CPU path — this builds on that and shows how the same pattern applies to a GPU workload.
 
 ### Deploy a Small GPU Model
 
+```bash
 kubectl apply -f C:\AKS_LABS\AKS_AI_and_LLM\AI_Runway\manifests\smallgpumodel.yaml
+```
 
-By requesting **spec.resources.gpu.count: 1**, the controller auto-selects **Dynamo** as the provider and **vLLM** as the engine
+The only difference from the CPU manifest is `spec.resources.gpu.count: 1`. That single field tells the controller this is a GPU workload, so it auto-selects **Dynamo** as the provider and **vLLM** as the engine.
 
 > [!TIP]
-> This small **0.6B** model keeps deployment times short.
+> This **0.6B** model is intentionally small to keep deployment times short during the demo.
