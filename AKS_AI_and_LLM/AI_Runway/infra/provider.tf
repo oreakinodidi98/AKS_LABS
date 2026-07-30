@@ -39,9 +39,9 @@ terraform {
   }
   #initialise the backend
   backend "azurerm" {
-    resource_group_name  = "tfstaterg01"
-    storage_account_name = "tfstate01919804057"
-    container_name       = "tfstate2"
+    resource_group_name  = "myresourcegroup1744947267"
+    storage_account_name = "tfstorage1744947267"
+    container_name       = "tfcontainer1744947267"
     key                  = "aks_ai_runway.tfstate"
     use_azuread_auth     = true
   }
