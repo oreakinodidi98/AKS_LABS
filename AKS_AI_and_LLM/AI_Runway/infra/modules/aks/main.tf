@@ -69,7 +69,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     max_count            = 6
     temporary_name_for_rotation = "temppool"
       enable_auto_scaling  = true
-    vm_size              = "Standard_D4s_v3"
+    vm_size              = "Standard_D4as_v4"
     # Node taints for system pool
     # only_critical_addons_enabled = true
     vnet_subnet_id = var.aks_subnet_id 
