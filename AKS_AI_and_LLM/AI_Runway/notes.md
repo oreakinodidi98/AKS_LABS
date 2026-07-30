@@ -28,13 +28,13 @@ In practice, that means you describe what you want to run, and the controller ha
 
 ### Compared With The Traditional Approach
 
-| Without AI Runway | With AI Runway |
-| --- | --- |
-| Learn each provider's CRDs and configuration separately | Use one `ModelDeployment` CRD across providers |
-| Manually match models to the right backend and engine | Let the controller select the backend and engine |
-| Configure routing resources for each model by hand | Create gateway resources automatically |
-| Track status per provider in different ways | Use unified status conditions and Prometheus metrics |
-| Write provider-specific YAML for every deployment | Describe the desired outcome and let the controller handle the rest |
+| Without AI Runway                                       | With AI Runway                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| Learn each provider's CRDs and configuration separately | Use one`ModelDeployment` CRD across providers                     |
+| Manually match models to the right backend and engine   | Let the controller select the backend and engine                    |
+| Configure routing resources for each model by hand      | Create gateway resources automatically                              |
+| Track status per provider in different ways             | Use unified status conditions and Prometheus metrics                |
+| Write provider-specific YAML for every deployment       | Describe the desired outcome and let the controller handle the rest |
 
 > [!NOTE]
 > AI Runway does not replace inference providers. It sits above them and gives you one consistent interface.
@@ -43,18 +43,18 @@ In practice, that means you describe what you want to run, and the controller ha
 
 Make sure these tools are available before you start the demo:
 
-| Tool | Purpose |
-| --- | --- |
-| [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) | Manage Azure resources and AKS credentials |
-| [kubectl](https://kubernetes.io/docs/tasks/tools/) | Work with the Kubernetes cluster |
-| [Bun](https://bun.sh) | Run the AI Runway dashboard |
-| [Helm](https://helm.sh/docs/intro/install/) | Install supporting components |
-| [jq](https://jqlang.org/) | Parse JSON output from `kubectl` and `curl` |
-| [yq](https://github.com/mikefarah/yq) | Parse YAML output from `kubectl` |
-| [Git](https://git-scm.com/) | Clone and manage the repository |
-| [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/) | Optional GitOps checks |
-| [GitHub Copilot CLI](https://github.com/features/copilot/cli/) | Optional terminal assistant, version 1.0.44 or later |
-| [Visual Studio Code](https://code.visualstudio.com/download) | Recommended editor, version 1.120.0 or later |
+| Tool                                                                     | Purpose                                              |
+| ------------------------------------------------------------------------ | ---------------------------------------------------- |
+| [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)      | Manage Azure resources and AKS credentials           |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/)                        | Work with the Kubernetes cluster                     |
+| [Bun](https://bun.sh)                                                     | Run the AI Runway dashboard                          |
+| [Helm](https://helm.sh/docs/intro/install/)                               | Install supporting components                        |
+| [jq](https://jqlang.org/)                                                 | Parse JSON output from`kubectl` and `curl`       |
+| [yq](https://github.com/mikefarah/yq)                                     | Parse YAML output from`kubectl`                    |
+| [Git](https://git-scm.com/)                                               | Clone and manage the repository                      |
+| [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/) | Optional GitOps checks                               |
+| [GitHub Copilot CLI](https://github.com/features/copilot/cli/)            | Optional terminal assistant, version 1.0.44 or later |
+| [Visual Studio Code](https://code.visualstudio.com/download)              | Recommended editor, version 1.120.0 or later         |
 
 ## Provision The Infrastructure
 
@@ -251,12 +251,12 @@ graph TD
 
 #### Key Design Points
 
-| Principle | What it means |
-| --- | --- |
-| Core controller is minimal | It validates specs, selects providers, manages routing, and updates status. |
-| Provider controllers are out-of-tree | Each provider has its own controller, so it can be versioned and released independently. |
-| UI is optional | You can use kubectl and CRDs directly; the web UI is only a convenience layer. |
-| Two-tier reconciliation | The core defines the interface, and providers implement it, similar to how CRI works in Kubernetes. |
+| Principle                            | What it means                                                                                       |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Core controller is minimal           | It validates specs, selects providers, manages routing, and updates status.                         |
+| Provider controllers are out-of-tree | Each provider has its own controller, so it can be versioned and released independently.            |
+| UI is optional                       | You can use kubectl and CRDs directly; the web UI is only a convenience layer.                      |
+| Two-tier reconciliation              | The core defines the interface, and providers implement it, similar to how CRI works in Kubernetes. |
 
 > [!NOTE]
 > Just like the kubelet talks to containerd through CRI and does not care whether you use containerd or CRI-O, the AI Runway core controller talks to providers through a standard interface. You can swap providers without changing your `ModelDeployment` specs.
@@ -404,3 +404,114 @@ You should see a JSON response with the model reply. That confirms the model is 
 > Later in the demo, you will see how the Gateway API Inference Extension routes traffic to multiple models through a single shared endpoint.
 
 When you are done, press **Ctrl+C** in the port-forward terminal to stop it. You can close the extra terminal tab.
+
+## Demo 2: Cluster Verification and Dashboar
+
+This demo will show you how to launch the AI Runway web dashboard and inspect your live deployment, verify our AKS cluster has GPU resources available and make sure the infrence gateway and AI runway components are ready
+
+
+### AI runway dashboard
+
+The AI runway Dashboard allows for teams to visualise available models, cluster health and deployment status. This is usefull for onboarding and incident triage providing a quick overview of enviroment. This is an optional web interface for visualising and managing deployments. This dashboard can run locally during dev or deployed in a cluster for shared team acess.
+
+To run locally :
+
+Clone the dashboard repository and open the repository in VS Code 
+
+```bash
+cd ~ && git clone --branch v0.6.0 https://github.com/kaito-project/airunway.git
+cd airunway
+```
+
+Start the dashboard
+
+```bash
+powershell -c "irm bun.sh/install.ps1 | iex"
+
+bun install
+```
+
+> [!NOTE]
+> Bun on Windows does not yet support `&` for parallel background processes, so run the backend and frontend in two separate terminals. We will keep this tab open throughout the workshop.
+
+**Terminal 1 – Backend (port 3001):**
+
+```bash
+bun run --filter '@airunway/backend' dev
+```
+
+**Terminal 2 – Frontend (port 5173):**
+
+```bash
+bun run --filter '@airunway/frontend' dev
+```
+
+This launches both the frontend and backend. The backend API runs on port 3001 and the frontend UI runs on port 5173. Open `http://localhost:5173` in your browser.
+
+### See Your Deployment in the Dashboard
+
+Open the **Deployments** page in the left sidebar. You should see **gemma2-2b-cpu** from Demo 1 listed with its phase and readiness status. Each row shows the deployment name, phase (Pending, Deploying, Running, Failed), provider, engine, replica counts, and age.
+
+![Deployments page showing gemma-cpu progressing through phases](image/notes/deployment.png)
+
+Click **gemma2-2b-cpu** to open the deployment details. This will show the runtime (KAITO), engine (LLAMACPP), model name, gateway endpoint, an example curl command, metrics, and logs. This is the same information queried with `kubectl get modeldeployment -o yaml`, presented visually.
+
+### Settings Page
+
+Click **Settings** in the left sidebar. The Settings page has three tabs that give a full picture of your cluster's readiness.
+
+**General** shows cluster connectivity and a runtime summary. Confirm it shows **Connected** to your AKS cluster with **4 of 4** runtimes installed.
+
+**Runtimes** gives a full view of each provider's installation status, capabilities (engines, serving modes, hardware support), and version. It also shows prerequisite checks (GPU Operator, Gateway API CRDs) and cluster autoscaling status. This is the place to confirm your cluster's inference stack is complete. If a provider shows as not installed, the auto-selection algorithm will skip it when matching deployments.
+
+![Settings page showing runtimes and integrations status](image/notes/settings.png)
+
+**Integrations** shows the status of external services like GPU Operator health, Gateway API CRDs, and Hugging Face OAuth. If you already have a Hugging Face account, click **Connect Hugging Face** and follow the OAuth flow. Once connected, you'll see your Hugging Face username and a **Connected** badge.
+
+![HuggingFace](image/notes/HuggingFace.png)
+
+### Browse the Model Catalog
+
+Click **Models** in the left sidebar. This page is a catalog of models organized by engine compatibility. Each card shows the model name, parameter count, required GPU memory, and supported inference engines (vLLM, SGLang, TensorRT-LLM, llama.cpp). The **Deploy →** button on each card opens a guided deployment flow where you pick a runtime, engine, and resource allocation. In this workshop, we use kubectl manifests instead so you can see auto-selection at work.
+
+![Model catalog page showing curated models with engine tags and Deploy buttons](image/notes/1785452693940.png)
+
+### Quick Cluster Health Check
+
+Now let's verify the cluster itself using the CLI. Open a new terminal tab and run the following command to confirm your cluster has the right node pools and GPU resources:
+
+```bash
+kubectl get nodes -o wide
+```
+
+You should see at least 3 nodes with **default** in the name (CPU pool) and 1 node with **inference** in the name (GPU pool). This is dependent on what settings you used to deploy the terraform configuration
+
+> [!TIP]
+> Skip this section if you do not have GPU ndes available on your account
+> 
+Check the GPU resources available:
+
+```bash
+kubectl get node -l agentpool=inference -o yaml | yq '.items[0].status.allocatable | pick(["cpu", "memory", "nvidia.com/gpu"])'
+```
+
+You should see **nvidia.com/gpu: "2"**, confirming 2 NVIDIA GPUs are available.
+
+> [!NOTE]
+> A GPU node pool with autoscaling is enabled for this lab. On your own cluster, you'd provision the node pool and choose a VM SKU that fits your workload. See the [AKS docs](https://learn.microsoft.com/azure/aks/use-nvidia-gpu?tabs=add-ubuntu-gpu-node-pool) for details on GPU node pools.
+
+Verify the inference gateway and AI Runway controllers are healthy:
+
+```bash
+kubectl get gateway -n istio-system 
+kubectl get pods -n airunway-system
+```
+
+The gateway should show **PROGRAMMED: True** with an external IP. All controller pods should be **Running**.
+
+> [!NOTE]
+> **Gateway API Inference Extension** extends the standard Gateway API for AI/ML workloads. It adds inference-aware routing and load balancing through components like InferencePool, Endpoint Picker Proxy (EPP), Body-Based Router (BBR), and HTTPRoute. AI Runway creates all of these automatically for each ModelDeployment that has gateway enabled. You'll see how the routing works in detail in Module 3.
+
+## Demo 3: GPU Auto-Selection & Validation
+
+This demo will show you how to deploy a GPU model with a minimal manifest, verify AI Runway auto-selects Dynamo and vLLM , compare GPU vs CPU inference speed
