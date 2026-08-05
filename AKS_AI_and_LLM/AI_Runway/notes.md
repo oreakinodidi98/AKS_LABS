@@ -482,37 +482,37 @@ Now let's verify the cluster itself using the CLI. Open a new terminal tab and r
 kubectl get nodes -o wide
 ```
 
-You should see at least 3 nodes with **default** in the name (CPU pool) and 1 node with **inference** in the name (GPU pool). The exact count depends on the Terraform configuration you applied.
+You should see at least 3 nodes with **default** in the name (CPU pool) and 1 node with **inference** in the name (GPU pool). The exact count will depend on the Terraform configuration you applied.
 
 > [!TIP]
-> Skip this section if you do not have GPU nodes available on your account.
-> 
-Check the GPU resources available:
+> If you don't have GPU nodes available on your account, skip the next two commands and jump straight to the gateway check below.
+
+Now check what GPU resources are actually allocatable on the inference node pool:
 
 ```bash
 kubectl get node -l agentpool=inference -o yaml | yq '.items[0].status.allocatable | pick(["cpu", "memory", "nvidia.com/gpu"])'
 ```
 
-You should see **nvidia.com/gpu: "2"**, confirming 2 NVIDIA GPUs are available.
+Look for **nvidia.com/gpu: "2"** in the output. That confirms 2 NVIDIA GPUs are allocatable on this node and that the GPU Operator has registered them correctly with Kubernetes.
 
 > [!NOTE]
-> A GPU node pool with autoscaling is enabled for this lab. On your own cluster, you'd provision the node pool and choose a VM SKU that fits your workload. See the [AKS docs](https://learn.microsoft.com/azure/aks/use-nvidia-gpu?tabs=add-ubuntu-gpu-node-pool) for details on GPU node pools.
+> The GPU node pool in this lab has autoscaling enabled. On your own cluster you provision the node pool separately and choose the VM SKU that suits your workload. The [AKS docs](https://learn.microsoft.com/azure/aks/use-nvidia-gpu?tabs=add-ubuntu-gpu-node-pool) cover the full GPU node pool setup, including SKU selection and driver configuration.
 
-Verify the inference gateway and AI Runway controllers are healthy:
+With the nodes confirmed, check that the inference gateway and AI Runway controllers are all in a healthy state:
 
 ```bash
 kubectl get gateway -n istio-system 
 kubectl get pods -n airunway-system
 ```
 
-The gateway should show **PROGRAMMED: True** with an external IP. All controller pods should be **Running**.
+The gateway should show **PROGRAMMED: True** with an external IP assigned. All pods in `airunway-system` should be in a **Running** state.
 
 > [!NOTE]
-> **Gateway API Inference Extension** extends the standard Gateway API for AI/ML workloads. It adds inference-aware routing and load balancing through components like InferencePool, Endpoint Picker Proxy (EPP), Body-Based Router (BBR), and HTTPRoute. AI Runway creates all of these automatically for each ModelDeployment that has gateway enabled. You will see how the routing works in detail in Demo 3.
+> The **Gateway API Inference Extension** extends the standard Kubernetes Gateway API with AI/ML-aware routing logic. It introduces a few components worth knowing: **InferencePool** groups model replicas behind a single addressable pool, **Endpoint Picker Proxy (EPP)** handles intelligent load balancing across those replicas, **Body-Based Router (BBR)** inspects the request body (such as the `model` field in an OpenAI-compatible request) to route traffic to the right pool, and **HTTPRoute** ties it all together. AI Runway provisions all of this automatically for every `ModelDeployment` that has gateway enabled — you don't configure any of it by hand.
 
 ## Demo 3: GPU Auto-Selection & Validation
 
-This demo shows you how to deploy a GPU model with a minimal manifest. You will see AI Runway auto-select Dynamo and vLLM, compare GPU versus CPU inference speed, and understand how the gateway routes requests across models. Demo 1 covered the CPU path — this builds on that and shows how the same pattern applies to a GPU workload.
+In Demo 1 we deployed a CPU model and watched AI Runway select a provider automatically. This demo follows the same pattern with a GPU workload. The manifest is almost identical — one extra field changes the entire provider and engine selection outcome. We'll walk through the selection algorithm step by step so you can see exactly what the controller is doing when you leave the provider unspecified.
 
 ### Deploy a Small GPU Model
 
@@ -520,7 +520,101 @@ This demo shows you how to deploy a GPU model with a minimal manifest. You will 
 kubectl apply -f C:\AKS_LABS\AKS_AI_and_LLM\AI_Runway\manifests\smallgpumodel.yaml
 ```
 
-The only difference from the CPU manifest is `spec.resources.gpu.count: 1`. That single field tells the controller this is a GPU workload, so it auto-selects **Dynamo** as the provider and **vLLM** as the engine.
+The only change from the CPU manifest is `spec.resources.gpu.count: 1`. That single field signals to the controller that this is a GPU workload. From there it filters the registered providers, scores their selection rules, and lands on **Dynamo** with **vLLM** as the engine — a completely different outcome from Demo 1, driven by that one field.
 
 > [!TIP]
-> This **0.6B** model is intentionally small to keep deployment times short during the demo.
+> This is a **0.6B** parameter model, deliberately chosen to keep deployment times short during the demo.
+
+Head over to the dashboard and click **Deployments**. You will see **qwen3-gpu** appear and step through the deployment lifecycle phases:
+
+![Deployments page showing qwen3-gpu with status](image/notes/1785505077645.png)
+
+### Auto-Selection Result
+
+While the deployment is starting, check what the controller picked. This is the same status query from Demo 1 — the pattern is consistent across all deployments:
+
+```bash
+kubectl get modeldeployment qwen3-gpu -n default -o yaml | yq '.status.provider, .status.engine'
+```
+
+The model can take a few minutes to reach a running state, so run the command a couple of times until the status is populated.
+
+Once it is live, the output will show Dynamo as the provider and vLLM as the engine — confirming the controller made a different call than it did for the CPU workload, all from that single `gpu.count` field.
+
+### How Auto-Selection Works
+
+When `spec.provider.name` is left out of the manifest, the controller runs a deterministic selection process:
+
+1. It fetches all registered **InferenceProviderConfigs** in the cluster
+2. It filters down to providers that satisfy your requirements — engine type, GPU or CPU, and serving mode
+3. For each matching provider it evaluates the **selectionRules**, which are CEL expressions with numeric priority scores
+4. The provider with the highest score wins. If two providers tie, the result is broken alphabetically by name
+
+For this specific deployment:
+
+- Both KAITO and Dynamo advertise GPU support, but Dynamo carries a higher-priority rule for GPU workloads, so it wins
+- No engine was specified, so the controller picked **vLLM** from the list of engines Dynamo supports
+- The full reasoning is written to **status.provider.selectedReason** — you can always trace back exactly why a provider was chosen
+
+> [!NOTE]
+> This is the core benefit of working through AI Runway rather than configuring a provider directly. You describe what the workload needs — GPU or CPU, a preferred engine, a serving mode — and the controller finds the right match. As providers are added or updated in the cluster, your manifests don't need to change.
+
+
+### Understand Resource Ownership
+
+When you delete a ModelDeployment, you want everything it created to go with it: the provider resource, the serving pods, the gateway routes. Without automatic cleanup, you'd end up with orphaned resources consuming GPU memory and cluster capacity after every delete. Kubernetes **owner references** solve this by chaining resources together so deletion cascades automatically.
+
+While pods are starting, look at the resource chain the controllers created.
+
+Check what the Dynamo provider deployed:
+
+```bash
+kubectl get modeldeployment qwen3-gpu -o yaml | yq '.status.provider'
+```
+
+The Dynamo provider created a **DynamoGraphDeployment** also named **qwen3-gpu** on your behalf. This is the provider-specific resource that represents your model deployment in Dynamo's world. The AI Runway controller set an owner reference from the DynamoGraphDeployment back to the ModelDeployment, which means Kubernetes understands that the DynamoGraphDeployment "belongs" to the ModelDeployment.
+
+Check the ownership chain:
+
+```bash
+kubectl get dynamographdeployments qwen3-gpu -o yaml | yq '.metadata.ownerReferences'
+```
+This shows an owner reference pointing back to the **ModelDeployment**. The ownership works in layers:
+
+- **AI Runway core controller** creates the ModelDeployment status and gateway resources (if needed)
+- **AI Runway Dynamo provider** creates the DynamoGraphDeployment, linked to the ModelDeployment via owner reference
+- **Dynamo operator** creates the serving pods, InferencePool, and EPP, linked to the DynamoGraphDeployment
+
+This chain means deleting the ModelDeployment cascades through all layers, so provider resources, pods, and gateway routing are all cleaned up automatically.
+
+### How Gateway Routing Works
+
+You noticed that the ownership chain includes gateway resources. The controller doesn't just deploy your model; it also wires up the networking so the model is reachable through a shared gateway. But why does a gateway matter in the first place?
+
+In production, platform teams typically serve multiple models. Different models serve different needs: a small CPU model handles lightweight tasks at low cost, a larger GPU model handles complex reasoning or code generation, and specialized models handle domain-specific workloads. Without a shared gateway, consumers would need to track separate endpoints for each model and update their configurations every time the platform team changes how a model is served.
+
+A single inference gateway solves this. Consumers get one stable URL and specify which model they want in the request body. The gateway handles the routing, and the platform team can add, remove, or reconfigure models without breaking any client integrations.
+
+You'll see this firsthand once the deployment finishes: two requests to the same URL, two different `model` values, two different backends. Here's how the routing works under the hood.
+
+The **Gateway API Inference Extension** adds four components that work together to route inference traffic.
+
+1. **Body-Based Router (BBR)**: Standard HTTP routers match on headers, paths, or query parameters. But LLM API requests specify the model in the JSON body, not the URL. The BBR solves this by inspecting the request body, reading the `model` field, and matching it to the correct HTTPRoute. Without it, you'd need a separate URL path per model, which breaks the OpenAI API contract.
+
+2. **HTTPRoute**: Once the BBR identifies which model the request is for, the HTTPRoute forwards it to the correct InferencePool. This is the same HTTPRoute resource from the standard Gateway API, so existing networking policies and observability tools work with it out of the box.
+
+3. **InferencePool**: Groups the serving pods for a specific model, similar to how a Kubernetes Service groups pods. The difference is that an InferencePool is inference-aware: it knows which pods are running which models and can expose metadata (like KV-cache state) that helps with smarter routing decisions.
+
+4. **Endpoint Picker Proxy (EPP)**: A standard load balancer picks pods using round-robin or least-connections, which ignores what's happening inside the inference engine. The EPP makes routing decisions based on inference-specific signals. For example, it can route a follow-up request to the pod that already has the conversation's KV-cache in GPU memory, avoiding redundant prefill computation. Different providers can implement their own EPP with provider-specific optimizations.
+
+```mermaid
+graph TD
+    Client["Client Request<br/>POST /v1/chat/completions<br/>{'model': 'Qwen/Qwen3-Coder-30B-A3B-Instruct'}"] --> Gateway[Gateway + Istio]
+    Gateway --> BBR[Body-Based Router<br/>Extracts 'model' field]
+    BBR --> Route[HTTPRoute<br/>qwen3-coder-30b]
+    Route --> Pool[InferencePool<br/>qwen3-coder-30b]
+    Pool --> EPP[EPP - Endpoint Picker Proxy<br/>Routes to best available pod]
+    EPP --> Pod[Model Server Pod]
+```
+
+AI Runway creates all of these gateway resources automatically for each ModelDeployment with gateway enabled. You don't need to set up the routing yourself.
