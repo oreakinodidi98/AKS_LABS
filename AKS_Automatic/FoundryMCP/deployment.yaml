@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcpserver
+  labels:
+    app: mcpserver
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mcpserver
+      azure.workload.identity/use: "true"
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: mcpserver
+        azure.workload.identity/use: "true"
+        prometheus.io/scrape: "true"
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: mcpserver
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: mcpserver
+      nodeSelector:
+        "kubernetes.io/os": linux
+      containers:
+      - name: mcpserver
+        image: oreacrregistry.azurecr.io/mcpserver:v1
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 8080
+        # The streamable-http endpoint requires MCP protocol headers, so probes use a TCP check instead of an HTTP GET.
+        livenessProbe:
+          tcpSocket:
+            port: 8080
+          failureThreshold: 12
+          periodSeconds: 5
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: 8080
+          failureThreshold: 12
+          periodSeconds: 5
+          timeoutSeconds: 5
+        startupProbe:
+          tcpSocket:
+            port: 8080
+          failureThreshold: 20
+          periodSeconds: 5
+          timeoutSeconds: 5
+        env:
+        - name: TITLE
+          value: "MCP Server"
+        - name: AGENT_INSTRUCTIONS
+          value: "You are a helpful assistant reachable through the Model Context Protocol."
+        - name: TEMPERATURE
+          value: "0.5"
+        - name: MODEL_ENDPOINT
+          value: "https://ore-mcp-foundry.services.ai.azure.com/models"
+        - name: MODEL_DEPLOYMENT
+          value: "gpt-5.4-mini"
