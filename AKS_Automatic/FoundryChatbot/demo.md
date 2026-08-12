@@ -1,39 +1,113 @@
-# Microsoft Foundry Chatbot on AKS Automatic
+# Foundry Chatbot (Streamlit) on AKS Automatic
 
-In this demo I walk through deploying an AKS Automatic cluster, provisioning a Microsoft Foundry resource with a chat model, and running an MCP server that connects directly to that model deployment.
+This folder (`AKS_Automatic/FoundryChatbot`) contains a **Streamlit** chatbot web app (`chatbot.py`) that talks to a chat model deployed in **Microsoft Foundry**. It's designed to run locally for development and to be containerized and deployed on an **AKS Automatic** cluster.
 
-## AKS Automatic
+Instead of storing a model API key, the app authenticates with `DefaultAzureCredential` — so locally it uses your Azure CLI login, and in the cluster each pod exchanges its Kubernetes service account token for a Microsoft Entra token at runtime (workload identity). No secrets sit in your cluster config.
 
-AKS Automatic takes care of node provisioning, autoscaling, and workload identity for you — there's very little cluster management involved. The key security piece here is that instead of storing a model API key in Kubernetes, each pod exchanges its Kubernetes service account token for a Microsoft Entra token at runtime. That means no secrets sitting in your cluster config. This same pattern — workload identity, container deployments, autoscaling — also works great for running MCP servers and AI agents that talk to Microsoft Foundry directly from AKS.
+## Contents
+
+| File | Purpose |
+| --- | --- |
+| `chatbot.py` | Streamlit chatbot app powered by a Microsoft Foundry model |
+| `requirements.txt` | Python dependencies (matches the container build) |
+| `.env` | Local environment variables (title, prompt, model endpoint/deployment, etc.) |
+| `Dockerfile` | Builds the container image (runs `streamlit run chatbot.py`) |
+| `deployment.yaml` / `service.yaml` | Kubernetes manifests for AKS |
+| `setup.ps1` | Provisioning helper script |
+| `image/chatbot.png` | Logo shown in the UI |
 
 ## Prerequisites
 
-Before running this, make sure you have:
+- Python 3.11+ (a local `.venv` is already present in this folder)
+- Azure CLI logged in (`az login`) with access to the Microsoft Foundry resource and model deployment
+- For deployment: Azure CLI that supports `az aks create --sku automatic`, plus `kubectl` and `yq`
 
-- Azure CLI logged in with permissions to create AKS clusters, ACR registries, Cognitive Services resources, managed identities, federated credentials, and role assignments
-- A version of the Azure CLI that supports `az aks create --sku automatic`
-- `kubectl` and `yq` installed locally
+## Configuration
 
-A few important things to know about the MCP server in this demo:
+The app reads its settings from environment variables (loaded from `.env` via `python-dotenv`):
 
-- It exposes a single tool that forwards a prompt to the deployed Microsoft Foundry model and returns the response
-- It's built with the MCP Python SDK using `FastMCP` with streamable HTTP transport — so any MCP-compatible client or agent framework can call it over the network
-- **The MCP endpoint has no authentication or authorization of its own** — the tool sends whatever prompt it receives straight to the Foundry model
-- The service is exposed to the public internet via a LoadBalancer
-- For production use, add ingress rules with authentication, TLS, rate limiting, and input validation before using this pattern
+| Variable | Default | Description |
+| --- | --- | --- |
+| `TITLE` | `Foundry chatbot` | Header shown in the UI |
+| `SYSTEM_PROMPT` | helpful-assistant prompt | System prompt sent to the model |
+| `TEMPERATURE` | `0.5` | Sampling temperature |
+| `MODEL_ENDPOINT` | Foundry models endpoint | Your Foundry `.../models` endpoint |
+| `MODEL_DEPLOYMENT` | `gpt-5.4-mini` | Name of the deployed model |
+| `PORT` | `8080` | Port used when containerized |
+| `IMAGE_NAME` | `chatbot.png` | Logo file inside the `image/` folder |
 
-## Calling the MCP Server
+Update `.env` so `MODEL_ENDPOINT` and `MODEL_DEPLOYMENT` point at your own Foundry resource.
 
-Once the service is deployed, wait for the `EXTERNAL-IP` to be populated. The streamable HTTP endpoint will be available at:
+## Run the app locally
 
+From this folder (`AKS_Automatic/FoundryChatbot`):
+
+1. Sign in to Azure so `DefaultAzureCredential` can get a token:
+
+   ```powershell
+   az login
+   ```
+
+2. Activate the virtual environment and install dependencies:
+
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   python -m pip install -r requirements.txt
+   ```
+
+3. Launch the Streamlit app (use `streamlit run`, **not** `python chatbot.py`):
+
+   ```powershell
+   streamlit run chatbot.py
+   ```
+
+   Streamlit prints a local URL (default `http://localhost:8501`) and opens it in your browser.
+
+To match the container's port, run:
+
+```powershell
+streamlit run chatbot.py --server.port 8080
 ```
-http://<EXTERNAL-IP>/mcp
+
+## Test the app
+
+- **Smoke test the UI** — open the browser URL, type a question in the input box, press **Post**, and confirm a response comes back. Each answer is tagged with the hostname that served it (useful for confirming which pod replied once deployed). Use **Clean** to reset the conversation.
+- **Verify dependencies are installed** in the active venv:
+
+  ```powershell
+  python -c "import streamlit, dotenv, azure.ai.inference, azure.identity; print('deps OK')"
+  ```
+
+- **Check the app imports without runtime errors:**
+
+  ```powershell
+  python -c "import chatbot; print('import OK')"
+  ```
+
+- **Confirm Azure auth works** (should return a token silently):
+
+  ```powershell
+  az account get-access-token --scope https://ai.azure.com/.default --query expiresOn -o tsv
+  ```
+
+If a request fails, check the terminal running Streamlit — exceptions from the model call are logged there via `logging.exception`.
+
+## Build and run the container
+
+```powershell
+docker build -t foundry-chatbot .
+docker run -p 8080:8080 foundry-chatbot
 ```
 
-I'm using MCP Inspector as the client. Start it with:
+Then browse to `http://localhost:8080`.
 
-```bash
-npx @modelcontextprotocol/inspector
+## Deploy to AKS Automatic
+
+AKS Automatic handles node provisioning, autoscaling, and workload identity for you. After building and pushing the image, apply the manifests:
+
+```powershell
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
 ```
 
-Select the streamable HTTP transport, connect to the endpoint, and call the tool with a prompt argument.
+Wait for the `EXTERNAL-IP` on the service to be populated, then open it in a browser. For production, add ingress with authentication, TLS, and rate limiting.

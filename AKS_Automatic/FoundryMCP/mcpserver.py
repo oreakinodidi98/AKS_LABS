@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Read environment variables
-TITLE = os.getenv("TITLE", "MCP Server")
+TITLE = os.getenv("TITLE", "MCP server running on AKS Automatic, powered by Microsoft Foundry")
 AGENT_INSTRUCTIONS = os.getenv("SYSTEM_PROMPT", "You are a helpful assistant reachable through the Model Context Protocol.")
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.5"))
 MODEL_ENDPOINT = os.getenv("MODEL_ENDPOINT", "https://ore-mcp-foundry.services.ai.azure.com/models")

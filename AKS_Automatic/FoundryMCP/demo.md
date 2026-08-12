@@ -1,6 +1,6 @@
 # Microsoft Foundry Chatbot on AKS Automatic
 
-In this demo I walk through deploying an AKS Automatic cluster, provisioning a Microsoft Foundry resource with a chat model, and running an MCP server that connects directly to that model deployment.
+In this demo I walk through deploying an AKS Automatic cluster, provisioning a Microsoft Foundry resource with a chat model, and running an MCP server that connects directly to that model deployment as well as a a Streamlit chatbot.
 
 ## AKS Automatic
 
@@ -22,6 +22,15 @@ A few important things to know about the MCP server in this demo:
 - The service is exposed to the public internet via a LoadBalancer
 - For production use, add ingress rules with authentication, TLS, rate limiting, and input validation before using this pattern
 
+## Process
+
+- Run setup.ps1 script
+- The script creates the cluster with the AKS Automatic SKU and disables SSH access.
+- AKS Automatic selects and manages compute capacity rather than using a fixed node VM size or node count .
+- The script runs through instructions to connect the Kubernetes service account to a user-assigned managed identity and authorize it to call Foundry.
+- The Script also creates an AIServices Foundry resource, deploys gpt-5.4-mini, and assigns the Cognitive Services User role to the workload identity.
+- The deployed chatbot calls the Foundry /models endpoint by using azure-ai-inference
+
 ## Calling the MCP Server
 
 Once the service is deployed, wait for the `EXTERNAL-IP` to be populated. The streamable HTTP endpoint will be available at:
@@ -37,3 +46,24 @@ npx @modelcontextprotocol/inspector
 ```
 
 Select the streamable HTTP transport, connect to the endpoint, and call the tool with a prompt argument.
+
+## calling Chatbot
+
+
+## Debugging
+
+Use the following to run the image locally with credentials from the host's Azure CLI cache before deploying it.
+
+```pwsh
+docker run -it `
+  --rm `
+  -p 8080:8080 `
+  -e TITLE="MCP server running on AKS Automatic, powered by Microsoft Foundry" `
+  -e AGENT_INSTRUCTIONS="You are a helpful assistant reachable through the Model Context Protocol." `
+  -e TEMPERATURE="0.5" `
+  -e MODEL_ENDPOINT=$env:MODEL_ENDPOINT `
+  -e MODEL_DEPLOYMENT="gpt-5.4-mini" `
+  -v "$HOME/.azure:/root/.azure:ro" `
+  --name "mcpserver" `
+  mcpserver:v1
+```
