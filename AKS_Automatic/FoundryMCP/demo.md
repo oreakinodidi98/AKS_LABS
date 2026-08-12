@@ -49,7 +49,6 @@ Select the streamable HTTP transport, connect to the endpoint, and call the tool
 
 ## calling Chatbot
 
-
 ## Debugging
 
 Use the following to run the image locally with credentials from the host's Azure CLI cache before deploying it.

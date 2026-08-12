@@ -39,15 +39,15 @@ spec:
         "kubernetes.io/os": linux
       containers:
       - name: mychatbot
-        image: oreacrregistry.azurecr.io/mychatbot:v1
+        image: oreacrregistry.azurecr.io/chatbot:v1
         imagePullPolicy: Always
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: "128Mi"
+            cpu: "100m"
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: "256Mi"
+            cpu: "200m"
         ports:
         - containerPort: 8080
         # The streamable-http endpoint requires MCP protocol headers, so probes use a TCP check instead of an HTTP GET.
