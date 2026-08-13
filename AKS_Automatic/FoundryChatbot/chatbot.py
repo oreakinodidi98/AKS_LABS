@@ -1,11 +1,13 @@
 import logging
 import os
 import streamlit
+
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 
 from azure.ai.inference import ChatCompletionsClient
 from azure.ai.inference.models import AssistantMessage, SystemMessage, UserMessage
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,6 +21,12 @@ MODEL_DEPLOYMENT = os.getenv("MODEL_DEPLOYMENT", "gpt-5.4-mini")
 PORT = int(os.environ.get("PORT", 8080))
 IMAGE_NAME = os.getenv("IMAGE_NAME", "chatbot.png")
 credential = DefaultAzureCredential()
+
+# Setup Entra ID Token Provider for Workload Identity authentication
+token_provider = get_bearer_token_provider(
+    DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+)
+
 model_client = None
 
 # open file
@@ -198,6 +206,20 @@ def generate_response(prompt):
     
     message = completion.choices[0].message.content
     return message
+    
+    # OpenAI format requires dict objects
+    # messages = [
+    #         {"role": item["role"], "content": item["content"]}
+    #         for item in streamlit.session_state['prompts']
+    #   ]
+
+    # completion = model_client.chat.completions.create(
+    #         model=MODEL_DEPLOYMENT,
+    #         messages=messages,
+    #         temperature=TEMPERATURE,
+    #   )
+        
+    # return completion.choices[0].message.content
   except Exception as e:
     logging.exception(f"Exception in generate_response: {e}")
     return f"Error connecting to AI service: {str(e)}"
