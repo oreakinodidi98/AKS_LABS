@@ -12,7 +12,7 @@ load_dotenv()
 
 # Read environment variables
 TITLE = os.getenv("TITLE", "Demo chatbot running on AKS Automatic, powered by Microsoft Foundry")
-AGENT_INSTRUCTIONS = os.getenv("SYSTEM_PROMPT", "You are a helpful assistant reachable through the Model Context Protocol.")
+AGENT_INSTRUCTIONS = os.getenv("AGENT_INSTRUCTIONS", "You are a helpful assistant reachable through the Model Context Protocol.")
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.5"))
 MODEL_ENDPOINT = os.getenv("MODEL_ENDPOINT", "https://ore-mcp-foundry.services.ai.azure.com/models")
 MODEL_DEPLOYMENT = os.getenv("MODEL_DEPLOYMENT", "gpt-5.4-mini")
@@ -165,7 +165,7 @@ def customize_streamlit_ui():
 
   # Initialize Streamlit session state
   if 'prompts' not in streamlit.session_state:
-    streamlit.session_state['prompts'] = [{"role": "system", "content": os.system}]
+    streamlit.session_state['prompts'] = [{"role": "system", "content": AGENT_INSTRUCTIONS}]
 
   if 'generated' not in streamlit.session_state:
     streamlit.session_state['generated'] = []
@@ -200,10 +200,11 @@ def generate_response(prompt):
     return message
   except Exception as e:
     logging.exception(f"Exception in generate_response: {e}")
+    return f"Error connecting to AI service: {str(e)}"
 
 # function to reset Streamlit session state to start a new chat from scratch
 def clean_click():
-  streamlit.session_state['prompts'] = [{"role": "system", "content": os.system}]
+  streamlit.session_state['prompts'] = [{"role": "system", "content": AGENT_INSTRUCTIONS}]
   streamlit.session_state['past'] = []
   streamlit.session_state['generated'] = []
   streamlit.session_state['user'] = ""
