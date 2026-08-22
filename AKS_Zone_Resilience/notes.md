@@ -1,6 +1,6 @@
 ---
-title: AKS Zone Resilience
-description: Notes on two-zone AKS resilience, regional capacity constraints, and capacity reservation options
+Title: AKS Zone Resilience
+Description: Notes on two-zone AKS resilience, regional capacity constraints, and capacity reservation options
 ---
 
 ## Contents
@@ -17,6 +17,9 @@ description: Notes on two-zone AKS resilience, regional capacity constraints, an
 | [Zone-resilient deployment types](#zone-resilient-deployment-types) | Difference between zonal and zone-redundant resources |
 | [Availability zones in AKS](#availability-zones-in-azure-kubernetes-service-aks) | Control plane, node pools, pod placement, and traffic distribution |
 | [Multi-region deployments](#multi-region-deployments) | Cross-region resilience, disaster recovery, and business continuity |
+
+## Intro
+
 
 ## Background
 
