@@ -1,6 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    azure.workload.identity/client-id: "2d9c7069-bd2f-457d-b335-b3c8f43ac994"
   name: mychatbot
   labels:
     app: mychatbot
@@ -22,6 +24,7 @@ spec:
         azure.workload.identity/use: "true"
         prometheus.io/scrape: "true"
     spec:
+      serviceAccountName: oa-sa
       topologySpreadConstraints:
       - maxSkew: 1
         topologyKey: topology.kubernetes.io/zone
@@ -77,6 +80,6 @@ spec:
         - name: TEMPERATURE
           value: "0.5"
         - name: MODEL_ENDPOINT
-          value: "https://ore-mcp-foundry.services.ai.azure.com/models"
+          value: "https://oa-ai-demo.services.ai.azure.com/"
         - name: MODEL_DEPLOYMENT
           value: "gpt-5.4-mini"

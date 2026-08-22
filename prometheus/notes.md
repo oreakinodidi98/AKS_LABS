@@ -38,3 +38,110 @@
 ## Selecting Series
 
 - can select a series by calling the metric name in query E.G. demo_api_request_duration_seconds_count
+- ``demo_ap_request_duration_secons_count{job ="demo"}``
+- ``demo_ap_request_duration_secons_count{method="GET", status="200"}``
+- ``rate(demo_api_request_duration_seconds_count{job="demo"}[5m])``
+- ``irate(demo_api_request_duration_seconds_count{job="demo"}[5m])``
+- ``increase(demo_api_request_duration_seconds_count{job="demo"}[1h])``
+- ``deriv(demo_disk_usage_bytes{job="demo"}[10m])``
+- ``predict_linear(demo_disk_usage_bytes{job="demo"}[15m],36000)``
+- ``sum(rate(demo_api_request_duration_seconds_count{job="demo"}[5m]))``
+
+## setting up grafana
+
+- ``docker run -d -p 3000:3000 --name grafanna -h grafana --net lab docker.io/grafana/grafana:11.6.0``
+- go to ``http://<machine-ip>:3000/`` -> ```http://192.168.56.1:3000/```
+- login using default admin username and password
+create prometheous datasource
+
+## node exporter (sysem level)
+
+- Start Node exporter: `` docker run -d --name node-exporter --net host --pid host -v /:/host:ro,rslave docker.io/prom/node-exporter:v1.9.1 --path.rootfs=/host``
+- or ``docker run -d --name node-exporter -p 9100:9100 docker.io/prom/node-exporter:v1.9.1``
+- go to ``http://<machine-ip>:9100/`` -> ```http://192.168.56.1:9100/```
+- Add the following to scrape config
+
+``` yaml
+  - job_name: "node"
+    static_configs:
+      - targets: ["host.docker.internal:9100"]
+``` 
+
+- Then restart prometheous ``docker restart prometheus``
+- ``rate(node_cpu_seconds_total{job="node"}[1m])``
+- ``sum without(cpu) (rate(node_cpu_seconds_total{mode!="idle",job="node"}[1m]))``
+- ``(node_filesystem_free_bytes / node_filesystem_size_bytes)*100``
+- `` node_time_seconds - timestamp(node_time_seconds)``
+
+## cAdvisor (Container level)
+
+- run the following
+
+```yaml
+docker run -d --name cadvisor -h cadvisor --net lab -v/:/rootfs:ro -v/var/run:/var/run:ro -v/sys:/sys:ro -v/var/lib/docker/:/var/lib/docker:ro -v/dev/disk/:/dev/disk:ro gcr.io/cadvisor/cadvisor:v0.52.1
+```
+
+- go to ``http://<machine-ip>:8080/metrics/`` -> ```http://192.168.56.1:8080/metrics/```
+- Add the following to scrape config
+
+```yaml
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+```
+
+- Then restart prometheous ``docker restart prometheus``
+- ``container_cpu_usage_seconds_total``
+- ``rate(container_cpu_usage_seconds_total[1m])``
+- ``sum without(cpu) (rate(container_cpu_usage_seconds_total{name="grafana"}[1m]))``
+- ``container_memory_usage_bytes{name="grafana"}``
+
+## instrumentation examples
+
+- Clone the following : ``git clone --depth=1 https://github.com/lftraining/LFS241.git``
+- Enter the following ``cd LFS241/instrumentation-exercise``
+- Enter python
+- ``docker build -t py-lab-app .``
+- ``docker run -d --net lab --name lab-app -h lab-app -e LC_ALL=Cpy-lab-app``
+
+## trouble shooting
+
+- run ``docker start prometheus d1 d2 d3`` if you exit container to start back up again
+- find out whats running on port 3000 ``Get-NetTCPConnection -LocalPort 3000 | Select-Object LocalAddress, LocalPort, State, OwningProcess``
+- stop owning process ``Stop-Process -Id 1234 -Force`` 
+
+## Main Prometheus instalation options
+
+- Can install from binary/source -> ``https://prometheus.io/download/``
+   - Create rest drectory: ``mkdir prom-binary`
+   - Change into directory
+   - Download Binary form: ``https://prometheus.io/download/``
+   - ``wget link``
+   - Decompress the bianary: tar -xvf <filename>
+- packange manager: ``sudo apt install prometheus``
+   - ``install node_exporter: sudo apt-get update && sudo apt-get install -y prometheus-node-exporter && sudo systemctl enable --now prometheus-node-exporter``
+- docker container
+- scripted install
+
+### Basic usage
+
+1. Acess directory
+2. run it: ./prometheus
+   1. To make it executable if not already use ``chmod +x prometheus``
+   2. ``./prometheus --config.file="prometheus.yml" --web.listen-address="<iP network:9090>" ``
+   3. ip network 0.0.0.0 gives acess to all ports
+3. Access it : ``http://localhost:9090`` or ``http://<Server IP Adress>:9090``
+4. Enter query ``up``
+5. To mak script executable ``chmod +x <name of script>`` -> run with sudo./
+6. Then run with ``sudo ./<script>``
+7. Type ``prometheus --version`` to verify or ``systemctl status prometheus.service`` or ``curl http://localhost:9090``
+8. ``man prometheus`` -> to get manual page
+9. ``prometheus --help`` or ``promtool``
+10. 
+
+
+
+
+
+
+
