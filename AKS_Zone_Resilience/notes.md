@@ -15,6 +15,8 @@ description: Notes on two-zone AKS resilience, regional capacity constraints, an
 | [Capacity assurance with ODCR](#capacity-assurance-with-odcr) | Guaranteed capacity and commercial considerations |
 | [Architecture decision guidance](#architecture-decision-guidance) | Questions to guide the final design |
 | [Zone-resilient deployment types](#zone-resilient-deployment-types) | Difference between zonal and zone-redundant resources |
+| [Availability zones in AKS](#availability-zones-in-azure-kubernetes-service-aks) | Control plane, node pools, pod placement, and traffic distribution |
+| [Multi-region deployments](#multi-region-deployments) | Cross-region resilience, disaster recovery, and business continuity |
 
 ## Background
 
@@ -142,4 +144,113 @@ With a zone-redundant resource, Microsoft manages the work required to spread th
 
 > **Memory line:** With zonal resources, the customer designs and manages cross-zone resilience. With zone-redundant resources, Microsoft manages it as part of the service.
 
-##
+## Availability zones in Azure Kubernetes Service (AKS)
+
+An availability zone is a separate physical location within an Azure region.
+Each zone contains one or more datacenters with independent power, cooling, and networking. This separation helps protect applications and data from a failure in a single datacenter or zone.
+
+My main takeaway is that enabling availability zones in AKS distributes cluster resources across physical locations within the same region. Deploying AKS nodes across multiple zones does not add an AKS-specific charge. The application still needs the right pod, storage, volume, and load-balancing configuration to benefit from that distribution.
+
+### AKS cluster components
+
+![AKS cluster components distributed across availability zones](./images/akscluster.png)
+
+#### Control plane
+
+Microsoft hosts and manages the AKS control plane. This includes the Kubernetes API server, scheduler, and `etcd`. Microsoft replicates these control-plane components across multiple availability zones.
+
+The other cluster resources are deployed into a managed resource group in the customer's Azure subscription. By default, its name begins with `MC_`, which stands for managed cluster.
+
+#### Node pools
+
+AKS node pools are implemented as Virtual Machine Scale Sets. Every AKS cluster requires at least one system node pool, which AKS creates during cluster deployment. This pool hosts critical system pods such as CoreDNS and Metrics Server. Additional user node pools can be added to host application workloads.
+
+I can deploy a node pool in one of three ways:
+
+| Node-pool type | Placement | Main consideration |
+| --- | --- | --- |
+| Zone-spanning | AKS spreads nodes across all selected zones | Provides distribution without managing a separate pool for each zone |
+| Zone-aligned | Each node pool is pinned to one specific zone | Provides granular control over placement, scaling, and zone-level operations |
+| Regional | No availability zone is selected | Azure places nodes within the region, but zone distribution is not guaranteed |
+
+![AKS node-pool availability-zone options](./images/nodeaz.png)
+
+##### Zone-spanning node pools
+
+In a zone-spanning node pool, AKS spreads nodes across all selected zones and balances the number of nodes between them. During a zone outage, nodes in the affected zone might become unavailable, while nodes in the remaining zones continue to operate.
+
+```pwsh
+# AKS cluster with a zone-spanning system node pool in all three availability zones with one node in each availability zone
+az aks create --resource-group example-rg --name example-cluster --node-count 3 --zones 1 2 3
+
+# Add one new zone-spanning user node pool with two nodes in each availability zone
+az aks nodepool add --resource-group example-rg --cluster-name example-cluster --name userpoola --node-count 6 --zones 1 2 3
+```
+
+##### Zone-aligned node pools
+
+In a zone-aligned design, each node pool is pinned to a specific availability zone. I can use this approach when the workload needs lower latency between nodes in the same zone, more granular control over scaling, or deliberate cluster-autoscaler behavior for each zone.
+
+```pwsh
+# Add three zone-aligned user node pools with two nodes in each zone
+az aks nodepool add --resource-group example-rg --cluster-name example-cluster --name userpoolx --node-count 2 --zones 1
+
+az aks nodepool add --resource-group example-rg --cluster-name example-cluster --name userpooly --node-count 2 --zones 2
+
+az aks nodepool add --resource-group example-rg --cluster-name example-cluster --name userpoolz --node-count 2 --zones 3
+```
+
+##### Regional node pools
+
+A node pool is regional when I do not set a zone assignment in the deployment template or command. Azure creates regional instances that are not pinned to a specific zone and places them within the region. There is no guarantee that these instances will be evenly spread across zones. They might even be placed in the same zone. As a result, a full zone outage could affect some or all instances in a regional node pool.
+
+### Verify node distribution
+
+I can use `az aks show` with a query to confirm which availability zones are configured for each node pool:
+
+```pwsh
+az aks show --name example-cluster --resource-group example-rg --query agentPoolProfiles[].availabilityZones --output tsv
+```
+
+I can then use `kubectl get nodes` to see the region and zone assigned to each node. The second command shows which node is hosting each pod:
+
+```pwsh
+kubectl get nodes -o custom-columns='NAME:metadata.name, REGION:metadata.labels.topology\.kubernetes\.io/region, ZONE:metadata.labels.topology\.kubernetes\.io/zone'
+kubectl describe pod | grep -e "^Name:" -e "^Node:"
+```
+
+### Distribute pods across zones
+
+Spreading nodes across zones does not automatically guarantee that application pods are evenly distributed. I can use Kubernetes topology spread constraints to tell the scheduler how to place pod replicas across the available zones.
+
+The `topologyKey: topology.kubernetes.io/zone` setting tells Kubernetes to use the node's availability-zone label as the placement boundary. The `maxSkew: 1` setting controls how unevenly pods can be distributed between those zones.
+
+For example, with three available zones, three replicas, sufficient node capacity, and an appropriate scheduling constraint, a maximum skew of `1` helps place at least one replica in each zone.
+
+### Distribute inbound traffic
+
+AKS deploys an Azure Standard Load Balancer by default. It distributes inbound traffic to healthy backend nodes across the region. If a node becomes unavailable, the load balancer stops directing new traffic to that node and routes traffic to healthy nodes instead.
+
+> **Key Takeaway** Availability zones spread the infrastructure, but I still need to design node pools, pod placement, storage, and traffic routing so the application can survive a zone failure.
+
+## Multi-region deployments
+
+Another option I learned to consider is deploying the application across multiple Azure regions. A multi-region architecture can achieve many of the same goals as a multi-zone design, including high availability, resilience, and greater scalability. However, it protects against a broader failure scope because the application is not dependent on a single Azure region.
+
+A multi-region deployment can be used in two ways:
+
+* It can provide an alternative when the preferred region cannot support the required in-region, multi-zone architecture.
+* It can complement an existing multi-zone deployment by adding another layer of protection outside the primary region.
+
+For critical workloads, the second region can provide more options for disaster recovery and business continuity. If the primary region becomes unavailable, traffic and operations can fail over to the secondary region, provided the application, data, networking, and dependent services have been designed for cross-region recovery.
+
+For this reason, customers should consider multi-region options for critical applications even when an in-region, multi-zone high-availability design is available. The decision should be based on the workload's recovery time, acceptable data loss, dependency, operational complexity, and cost requirements. Also considering details around latency, and synchronous/asynchronous data replication
+
+> **Key Takeaway:** Availability zones protect against failures within a region. A multi-region design adds protection against the loss of an entire region.
+
+## Troubleshooting
+
+## References
+
+* [Configure availability zones](https://learn.microsoft.com/en-us/azure/aks/reliability-availability-zones-configure?pivots=azure-cli)
+* [Zone resiliency recommendations for Azure Kubernetes Service (AKS)](https://learn.microsoft.com/en-us/azure/aks/reliability-zone-resiliency-recommendations)
