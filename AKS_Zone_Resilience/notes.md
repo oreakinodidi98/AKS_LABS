@@ -231,6 +231,42 @@ For stateless applications, a two-zone design is a supported resilient architect
 
 Stateful workloads need additional consideration. Workloads that require quorum might still need a three-zone design or additional multi-region protections to meet their availability and recovery requirements.
 
+## AKS Cluster: Zone-redundant Node pools
+
+An AKS cluster with zone redundant nde pools involves deploying an AKS cluster where the nodes are distributed evenly across the availability zones within a region.
+
+The diagram below shows an AKS cluster with a zone-redundant system-mode node pool and a zone-redundant user-mode node pool
+
+![AKS Cluster; Zone-redundant Node pools](./images/ZoneRedundantNodePools.png)
+
+Deploy the script to create the following resources.
+
+### Pod topology spread constraints
+
+When deploying pods across multiple availability zones, it is important to distribute the replicas evenly. Spreading the cluster nodes across zones does
+not automatically guarantee that the application pods will also be spread across those zones.
+
+To control this placement, customers can use the Kubernetes feature called **pod topology spread constraints**. These constraints tell the Kubernetes scheduler how to distribute pod replicas across failure domains such as regions, availability zones, and individual nodes.
+
+Customers can use topology spread constraints at different levels:
+
+* Spread replicas across availability zones so that a zone failure does not remove every instance of the application.
+* Spread replicas across different nodes within the same zone to reduce the effect of a node failure or maintenance activity.
+
+This placement strategy improves fault tolerance and helps the application remain available if a node or an entire zone becomes unavailable. It can also improve resource utilization, reduce downtime, and provide a more reliable platform for customer workloads running across multiple availability zones.
+
+> **Notes:** Spreading nodes creates failure domains. Pod topology spread constraints make sure application replicas use them.
+
+## AKS Cluster: Zonal Node pools
+
+For a zonal node pool stratergy customers would deploy the AKS cluster with 3 user node pools each assighned to a different availability zone within the current region.
+
+The diagram below shows this architecture using a system-mode node pool and three zonal user-mode node pools, each located in a separate availability zone
+
+![Zonal Node pools](./images/ZonalNodePools.png)
+
+Deploy the script to create the following resources.
+
 ## How a two-zone AKS deployment remains resilient
 
 > [!NOTE]
@@ -288,12 +324,16 @@ For this customer, the key message was that a two-zone AKS architecture can prov
 
 ## Key takeaways
 
-The discussion produced several important takeaways:
+The engagment produced several important takeaways:
 
-* Due to global supply constraints, the industry is increasingly adopting two-zone architectures as a standard approach. Azure documentation and services are also being updated to reflect this shift.
+* Due to global supply constraints, the industry is increasingly adopting two-zone architectures as a standard approach. Azure documentation and services are being updated to reflect this shift.
 * The service-level agreement (SLA) for a two-zone deployment is effectively the same as the SLA for a three-zone deployment within a single region.
 * Customers need clear guidance about the negligible SLA difference and the operational benefits of a two-zone deployment.
 * The primary architectural tradeoff is the amount of capacity lost during a zone failure, rather than a significant difference in the regional SLA.
+* A two-zone design still provides resilience against the loss of a single zone.
+* The main tradeoff is capacity during a zone failure as in a two-zone design, losing one zone removes roughly 50% of the cluster’s in region compute capacity, versus roughly 33% in a three-zone design
+* Customers should therfore focus on sizing the node pools so the surviving zone can support critical workloads, along with using autoscaling and Kubernetes workload distribution controls
+* Focus on distributing AKS node pools evenly across both zones and  consider On Demand Capacity Reservation for the required baseline capacity
 
 ## Troubleshooting
 

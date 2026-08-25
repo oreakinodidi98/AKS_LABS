@@ -117,7 +117,7 @@ docker run -d --name cadvisor -h cadvisor --net lab -v/:/rootfs:ro -v/var/run:/v
    - Change into directory
    - Download Binary form: ``https://prometheus.io/download/``
    - ``wget link``
-   - Decompress the bianary: tar -xvf <filename>
+   - Decompress the bianary: ```tar -xvf <filename>```
 - packange manager: ``sudo apt install prometheus``
    - ``install node_exporter: sudo apt-get update && sudo apt-get install -y prometheus-node-exporter && sudo systemctl enable --now prometheus-node-exporter``
 - docker container
@@ -137,11 +137,24 @@ docker run -d --name cadvisor -h cadvisor --net lab -v/:/rootfs:ro -v/var/run:/v
 7. Type ``prometheus --version`` to verify or ``systemctl status prometheus.service`` or ``curl http://localhost:9090``
 8. ``man prometheus`` -> to get manual page
 9. ``prometheus --help`` or ``promtool``
-10. 
+10. ``sudo apt install docker``
+11. ``systemctl status prometheus.service``
+12. ``journalctl -u prometheus``
+
+To view metric data from the command line:
+
+- ``curl http://localhost:9090/metrics``
+- ``curl 'http://localhost:9090/api/v1/query?query=up'``
+- query_log_file: /var/lib/prometheus/query.log
+- ``curl 'http://localhost:9090/api/v1/query?query=process_resident_memory_bytes' | jq``
+- ``curl 'http://localhost:9090/api/v1/query?query=prometheus_engine_query_log_failures_total' | jq``
 
 
+Web ui
 
-
-
+- Acess through ``Http://<ip_adrdress>:9090`` or ``Http://localhost:9090``
+- ``top``
+- ``chmod +x node-exporter-install.sh``
+- ``sudo ss -lptn 'sport = :9100'`` -> check whas running
 
 
