@@ -267,6 +267,23 @@ The diagram below shows this architecture using a system-mode node pool and thre
 
 Deploy the script to create the following resources.
 
+When creating a cluster using the ``az aks create`` command, the ``--zones`` parameter allows users to specify the availability zones for deploying agent nodes.
+
+However this parameter does not control the deployment of managed control plane components.
+
+These components are automatically distributed across all available zones in the region during cluster deployment.
+
+Also in the script i have set the ``balance-similar-node-groups`` setting of the cluster autoscaler profile to ``true``. This is needed to make sure autoscaller can scale up and keep the sizes of the node pools balanced.
+
+Essentially the cluster autoscaler will automatically identify node groups with the same instance type and the same set of labels (except for automatically added zone label) and tries to keep the sizes of those node groups balanced.
+
+However, this doesnt guarantee similiar node pools will have exactly the same size.
+
+- Balancing is only done at scale up: The cluster autoscaler will still scale down underutilized nodes regardless of the relative sizes of underlying node groups.
+- The cluster autoscaler will only add as many nodes as required to run all existing pods. If the number of nodes is not divisible by the number of balanced node pools, some groups will get 1 more node than others
+- Cluster Autoscaler will only balance between node groups that can support the same set of pending pods. If you run pods that can only go to a single node group (for example due to nodeSelector on zone label) Cluster Autoscaler will only add nodes to this particular node group.
+- Can opt-out a node group from being automatically balanced with other node groups using the same instance type by giving it any custom labe
+
 ## How a two-zone AKS deployment remains resilient
 
 > [!NOTE]
@@ -335,6 +352,16 @@ The engagment produced several important takeaways:
 * Customers should therfore focus on sizing the node pools so the surviving zone can support critical workloads, along with using autoscaling and Kubernetes workload distribution controls
 * Focus on distributing AKS node pools evenly across both zones and  consider On Demand Capacity Reservation for the required baseline capacity
 
+## Testing Demo
+
+After deploying scripts, we can simulate a scenario where the agent nodes in a specific availability zone suddenly become unavailable due to a failure. The aim of the demo is to verify that the application continues to run successfully on the agent nodes in the other availability zones. To prevent interference from the cluster autoscaler during the test and make sure  each zonal node pool has exactly two agent nodes, you can run the script in the test folder. This script disables the cluster autoscaler on each node pool and manually sets the number of nodes to two for each of them
+
+![pods are distributed across the agent nodes and zonal node pools](./images/LocallyRedundantStorage.png)
+
+The diagrma shows how the pods are distributed evenly across the zonal node pools, each within a separate availability zone, ensuring high availability and fault tolerance.
+
+Each pod is associated with an LRS managed disk that is located in the same availability zone as the pod. This leads to optimal data locality and minimizes network latency for disk operations. Overall, this distribution strategy increases the resiliency and performance of the system, providing a reliable and efficient deployment architecture.
+
 ## Troubleshooting
 
 ## References
@@ -342,3 +369,5 @@ The engagment produced several important takeaways:
 * [Configure availability zones](https://learn.microsoft.com/en-us/azure/aks/reliability-availability-zones-configure?pivots=azure-cli)
 * [Zone resiliency recommendations for Azure Kubernetes Service (AKS)](https://learn.microsoft.com/en-us/azure/aks/reliability-zone-resiliency-recommendations)
 * [zone-redundant-aks-and-storage](https://github.com/Azure-Samples/zone-redundant-aks-and-storage)
+* [Cluster autoscaler profile settings](https://learn.microsoft.com/en-us/azure/aks/cluster-autoscaler?tabs=azure-cli#cluster-autoscaler-profile-settings)
+* [Autoscaler](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#im-running-cluster-with-nodes-in-multiple-zones-for-ha-purposes-is-that-supported-by-cluster-autoscaler)

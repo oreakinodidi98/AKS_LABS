@@ -157,4 +157,145 @@ Web ui
 - ``chmod +x node-exporter-install.sh``
 - ``sudo ss -lptn 'sport = :9100'`` -> check whas running
 
+Grafana:
 
+Visualisation tool for data analysis 
+listens on port 3000
+web based system that acts as a server and sits on top of prometheous
+
+Alerting and rules
+
+
+To use the script, set the permissions to executable, and runm the script with sudo.
+
+- ``chmod +x alertmanager-script.sh``
+- ``sudo ./alertmanager-script.sh``
+
+When you are done, check the installation, service, and web connection:
+
+- ``alertmanager --version``
+- ``systemctl status alertmanager``
+- ``http://4.225.174.238:9093``
+- promtool check rules rules.yml
+- amtool check-config alertmanager.yml -> used to check allert manager config
+
+troubleshoting
+
+Because my local home Wi-Fi / network is blocking outbound traffic on ports like 3000 and 9093.
+Many standard home routers or internet providers (like Virgin Media, which we saw earlier) or corporate/public networks restrict non-standard web traffic ports. 
+Use SSH Port Forwarding
+So instead of Instead of opening up custom ports on Azure and fighting your home router's firewall block, the most secure and reliable way to access Grafana and Alertmanager is via an SSH Tunnel. This tunnels web traffic securely through your already-working port 22!
+- ``ssh -i "path_to_your_key.pem" -L 3000:localhost:3000 -L 9093:localhost:9093 azureuser@4.225.174.238``
+- ``ssh -i "$HOME\.ssh\prometheus-lab" -L 3000:localhost:3000 -L 9093:localhost:9093 azureuser@4.225.174.238``
+- Once it connects and drops you into the VM shell, leave that terminal window open (the tunnel stays active as long as the SSH session is running).
+- in vim ``: set numbers`` or ``:set nu``
+
+## Track SLO
+
+recording rule : request sucess rate
+promtool check rules /etc/prometheus/rules/slo.yml
+promtool check config /etc/prometheus/prometheus.yml
+Define what good service looks like (SLI = success rate)
+Set a target (SLO = 99.9%)
+Calculate error budget (0.1% failures allowed)
+Alert when burning budget too fast (burn rate)
+
+## promql
+
+![alt text](image.png)
+
+Selecting data:
+
+1. Select all Prometheus metrics:
+
+- ``prometheus_http_requests_total``
+
+2. Filter by label (exact match):
+
+- ``prometheus_http_requests_total{code="200"}``
+
+3. Filter by multiple labels:
+
+- ``prometheus_http_requests_total{code="200",handler="/metrics"}``
+
+4. Regex matching:
+
+- ``prometheus_http_requests_total{handler=~"/api.*"}``
+- Matches any handler starting with /api
+
+5. Negative matching:
+
+- ``up{job!="prometheus"}``
+- Shows all jobs except Prometheus.
+
+### From CLI
+
+- Can Query from command line:
+- ``curl 'http://localhost:9090/api/v1/query?query=up'``
+
+## Rates and Derivatives
+
+Rates calculate change over time. Essential for counter metrics.
+
+Counters only increase (except on reset). Raw values aren't useful - we need rates.
+
+1. View raw counter:
+
+- ``prometheus_http_requests_total{code="200"}``
+- Large numbers that keep growing.
+
+2. Calculate rate (per-second average):
+
+- Derivative: The rate of change of a value over time. 
+- In PromQL, functions like rate() and irate() calculate derivatives by measuring how quickly a counter is increasing, giving you the speed of change rather than the raw total.
+
+- ``rate(prometheus_http_requests_total{code="200"}[5m])``
+
+3. Instant rate:
+
+- ``irate(prometheus_http_requests_total{code="200"}[5m])``
+- Uses only last 2 samples
+
+4. Total increase:
+
+- ``increase(prometheus_http_requests_total{code="200"}[1h])``
+- Total requests in last hour.
+
+### Testing by Generate Load
+
+Create some traffic:
+
+- ``for ($i=1; $i -le 100; $i++) { curl http://localhost:9090/metrics -OutFile $null }``
+
+## Aggregating over Time
+
+- Aggregating over Time: This is when you calculate summary statistics (average, max, min) across a time range rather than at a single moment.
+- Functions like ``avg_over_time()`` and ``max_over_time()`` analyze how metrics behave over periods, smoothing out spikes and revealing trends.
+
+Time-based aggregations show trends and patterns.
+
+1. Average over time:
+
+- ``avg_over_time(up[5m])``
+- Average uptime over last 5 minutes.
+
+This can be useful for flapping services. For example if our SSH service was only working 80% of the time:
+
+- ``avg_over_time(node_systemd_unit_state{name="ssh.service", state="active", job="remote-systems"}[10m])``
+
+Note: Replace  IP address with yours. Also, use sshd if necessary on your distribution of Linux.
+
+2. Maximum over time:
+
+- ``max_over_time(prometheus_http_request_duration_seconds_sum[1h])``
+- Peak request duration in last hour.
+
+3. Minimum over time:
+
+- ``min_over_time(process_resident_memory_bytes[10m])``
+- Lowest memory usage in last 10 minutes.
+
+4. Count over time:
+
+- ``count_over_time(up[5m])``
+- Number of samples collected. This should show a sampling rate of once per 15 seconds (normally).

@@ -1,0 +1,19 @@
+groups:
+  - name: slo
+    interval: 30s
+    rules:
+      - record: http:availability:sli
+        expr: |
+          sum(rate(prometheus_http_requests_total{code=~"2.."}[5m]))
+          /
+          sum(rate(prometheus_http_requests_total[5m]))
+  - name: slo_alerts
+    rules:
+      - alert: HighErrorBudgetBurn
+        expr: (1 - http:availability:sli) / (1 - 0.999) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Burning error budget 10x faster than sustainable"
+          description: "The service is consuming its error budget at an unsustainable rate."
