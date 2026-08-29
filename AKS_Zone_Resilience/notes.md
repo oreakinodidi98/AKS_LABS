@@ -1,6 +1,6 @@
 ---
 title: AKS Zone Resilience
-description: Notes on two-zone AKS resilience, regional capacity constraints, and capacity reservation options
+description: Guidance on designing a zone-resilient AKS clusters, including node-pool strategies, storage, scaling, and capacity constraints
 ---
 
 ## Contents
@@ -10,14 +10,22 @@ description: Notes on two-zone AKS resilience, regional capacity constraints, an
 | [Introduction](#introduction) | Why resilience planning matters and what these notes cover |
 | [Background](#background) | Customer scenario and reason for the engagement |
 | [Customer requirements and constraints](#customer-requirements-and-constraints) | Regional dependencies and capacity limitations |
+| [Availability zones](#availability-zones) | How availability zones provide isolation within an Azure region |
 | [Zone-resilient deployment types](#zone-resilient-deployment-types) | Difference between zonal and zone-redundant resources |
 | [Availability zones in AKS](#availability-zones-in-azure-kubernetes-service-aks) | Control plane, node pools, pod placement, and traffic distribution |
+| [Workload and storage configuration](#workload-and-storage-configuration) | Storage redundancy choices and workload considerations |
 | [Stateless and stateful applications](#stateless-and-stateful-applications) | Simple explanation of the two workload types |
+| [Managed disks with zone-spanning node pools](#managed-disks-with-zone-spanning-node-pools) | Using ZRS persistent volumes for cross-zone recovery |
+| [AKS cluster: Zone-redundant node pools](#aks-cluster-zone-redundant-node-pools) | Zone-spanning node pools and pod topology spread constraints |
+| [AKS cluster: Zonal node pools](#aks-cluster-zonal-node-pools) | Zone-aligned node pools and autoscaler balancing |
 | [How a two-zone AKS deployment remains resilient](#how-a-two-zone-aks-deployment-remains-resilient) | Capacity impact of a zone failure |
 | [Capacity assurance with ODCR](#capacity-assurance-with-odcr) | Guaranteed capacity and commercial considerations |
 | [Multi-region deployments](#multi-region-deployments) | Cross-region resilience, disaster recovery, and business continuity |
 | [Architecture decision guidance](#architecture-decision-guidance) | Questions to guide the final design |
 | [Key takeaways](#key-takeaways) | Main lessons from the discussion |
+| [Testing demo](#testing-demo) | Simulate a zonal failure and verify workload resilience |
+| [Troubleshooting](#troubleshooting) | Common issues and investigation guidance |
+| [References](#references) | Supporting documentation and examples |
 
 ## Introduction
 
@@ -33,7 +41,7 @@ This section gives some background into why this article came about. A customer 
 
 The customer originally required an AKS deployment across three availability zones in the South Central region because of dependencies on existing infrastructure. However, regional capacity constraints and other technical limitations prevented the requested deployment. This led to a broader discussion about two-zone resilience, alternative Azure regions, and the impact of moving the workload to another region.
 
-## Customer requirements and constraints
+### Customer requirements and constraints
 
 The engagement highlighted the following requirements and constraints:
 
@@ -47,7 +55,7 @@ The engagement highlighted the following requirements and constraints:
 
 ## Availability Zones
 
-An availability zone is a seperate group of datacenters in a region. Key benefits include been close enough to have a fast connection to each other and low latency, but far enough to reduce the chances of all zones been affected by a local issue. Each availability zone has its own power, cooling, and networking systems and if one zone goes down, the other zones can still support regional services, capacity, and high availability. All of this to make sure your data remains accesible and in syn during unexpected events. Important to note not all the Azure regions support availability zones.
+An availability zone is a seperate group of datacenters in a region. Key benefits include been close enough to have a **fast connection** to each other and **low latency**, but far enough to reduce the chances of all zones been affected by a local issue. Each availability zone has its own power, cooling, and networking systems and if one zone goes down, the other zones can still support regional services, capacity, and high availability. All of this to make sure your data remains accesible and in sync during unexpected events. Important to note not all the Azure regions support availability zones.
 
 ![Availability zones](./images/availabilityzones.png)
 
@@ -77,16 +85,15 @@ With a zone-redundant resource, Microsoft manages the work required to spread th
 
 To find out more about which services support what, you can refer to [Azure services that support availability zones document](https://learn.microsoft.com/en-us/azure/reliability/availability-zones-service-support)
 
-> **Memory line:** With zonal resources, the customer designs and manages cross-zone resilience. With zone-redundant resources, Microsoft manages it as part of the service.
+> **Key distinction:** With zonal resources, the customer designs and manages cross-zone resilience. With zone-redundant resources, Microsoft manages it as part of the service.
 
 ## Availability zones in Azure Kubernetes Service (AKS)
 
 An availability zone is a separate physical location within an Azure region. Each zone contains one or more datacenters with independent power, cooling, and networking. This separation helps protect applications and data from a failure in a single datacenter or zone.
 
-Enabling availability zones in AKS distributes agent nodes across physically separate datacenters within the same region. If one zone fails, nodes in the other zones can continue running. Deploying AKS nodes across multiple zones
-does not add an AKS-specific charge, but the application still needs the right pod placement, storage, volume, and load-balancing configuration to benefit from that distribution.
+Enabling availability zones in AKS distributes nodes across physically separate datacenters within the same region. If one zone fails, nodes in the other zones can continue running. Deploying AKS nodes across multiple zones does not add an AKS-specific charge, but the application still needs the right pod placement, storage, volume, and load-balancing configuration to benefit from that distribution.
 
-Some workloads also have **co-location requirements**. This means that related resources need to run in the same availability zone. For example, an application might need its pod close to another service to reduce latency, or a pod might need to run in the same zone as the zonal disk it uses. These requirements affect whether customers can spread one node pool across zones or create separate node pools aligned to specific zones.
+Some workloads also have **co-location requirements**. This means that related resources need to run in the same availability zone. For example, an application might need its pod close to another service to reduce latency, or a pod might need to run in the same zone as the zonal disk it uses. These requirements affect if customers can spread one node pool across zones or create separate node pools aligned to specific zones.
 
 To solve for these requirments customers can deploy the AKS cluster into a single Availability Zone, ensuring proximity and minimizing internode latency. Or PPG (Proximety placemen Groups) can be used to place nodes in the same data centre for  optimal communication, minimizing latency and maintining zone redundency.
 
@@ -96,50 +103,42 @@ To solve for these requirments customers can deploy the AKS cluster into a singl
 
 #### Control plane
 
-Microsoft hosts and manages the AKS control plane. This includes the Kubernetes API server, scheduler, and `etcd`. Microsoft replicates these control-plane components across multiple availability zones.
+Microsoft hosts and manages the AKS control plane. This includes the `Kubernetes API server`, `scheduler`, and `etcd`. Microsoft replicates these control-plane components across multiple availability zones.
 
-The other cluster resources are deployed into a managed resource group in the customer's Azure subscription. By default, its name begins with `MC_`, which stands for managed cluster.
+The other cluster resources are deployed into a **managed resource group** in the customer's Azure subscription. By default, its name begins with `MC_`, which stands for **managed cluster**.
 
 #### Node pools
 
-AKS node pools are implemented as Virtual Machine Scale Sets. Every AKS cluster requires at least one system node pool, which AKS creates during cluster deployment. This pool hosts critical system pods such as CoreDNS and Metrics Server. Additional user node pools can be added to host application workloads.
+AKS node pools are implemented as Virtual Machine Scale Sets. Every AKS cluster requires at least one **system node pool**, which AKS creates during cluster deployment. This pool hosts critical system pods such as **CoreDNS** and **Metrics Server**. Additional **user node pools** can be added to host application workloads.
 
-I can deploy a node pool in one of three ways:
+Customers can deploy a node pool in one of three ways:
 
 | Node-pool type | Placement | Main consideration |
 | --- | --- | --- |
 | Zone-spanning | AKS spreads nodes across all selected zones | Provides distribution without managing a separate pool for each zone |
-| Zone-aligned | Each node pool is pinned to one specific zone | Provides granular control over placement, scaling, and zone-level operations |
+| Zone-aligned (Zonal) | Each node pool is pinned to one specific zone | Provides granular control over placement, scaling, and zone-level operations |
 | Regional | No availability zone is selected | Azure places nodes within the region, but zone distribution is not guaranteed |
 
-##### Choosing a zone-resilient node-pool strategy
+##### Choosing a zone resilient node pool strategy
 
 There are two main ways customers can arrange AKS worker nodes across availability zones. Both approaches provide zonally resilient worker capacity, but they offer different levels of control.
 
 | Approach | How it works | Best suited for |
 | --- | --- | --- |
 | One zone-spanning node pool | One node pool contains nodes spread across zones 1, 2, and 3 | Simpler management and general stateless workloads |
-| Three zone-aligned node pools | Each node pool is pinned to a different zone | Precise scaling, storage placement, and zone-level control |
+| Three zone-aligned (Zonal) node pools | Each node pool is pinned to a different zone | Precise scaling, storage placement, and zone-level control |
 
-With a **zone-spanning node pool**, AKS manages one pool and spreads its nodes across the selected zones. If zone 1 fails, nodes in zones 2 and 3 can continue
-running. This option is simpler to manage, but scaling happens at the node-pool level, so customers have less control over which zone receives a new node.
+With a **zone-spanning node pool**, AKS manages one pool and spreads its nodes across the selected zones. If zone 1 fails, nodes in zones 2 and 3 can continue running. This option is simpler to manage, but scaling happens at the node-pool level, so customers have less control over which zone receives a new node.
 
-With **three zone-aligned node pools**, customer can create one pool in each zone. For example, one pool is pinned to zone 1, another to zone 2, and another to zone 3. This design gives more control over scaling, pod placement, and zone-specific operations. It is useful when a workload or locally redundant disk must remain in a particular zone. The tradeoff is that you have three node pools to configure, scale, monitor, and maintain.
+With **three zone-aligned (Zonal) node pools**, customer can create one pool in each zone. For example, one pool is pinned to zone 1, another to zone 2, and another to zone 3. This design gives more control over scaling, pod placement, and zone-specific operations. It is **useful when a workload or locally redundant disk must remain in a particular zone.** The tradeoff is that you have three node pools to configure, scale, monitor, and maintain.
 
-The node pool layout does not automatically guarantee that pods are evenly distributed. Customers still need to use topology spread constraints or affinity rules
-to control pod placement across zones.
-
-Storage also needs to match the node pool strategy:
-
-* Zone-redundant storage (ZRS) disks replicate data across availability zones and provide greater flexibility during a zone failure.
-* Locally redundant storage (LRS) disks remain in one zone and can attach only to nodes in that same zone.
-* Stateful applications also need a plan for data replication, quorum (Quorum means a majority must remain available and agree before the system can safely continue.), and recovery during a zone failure.
+The node pool layout **does not automatically guarantee that pods are evenly distributed.** Customers still need to use **topology spread constraints** or **affinity rules** to control pod placement across zones.
 
 > **Key Takeaway:** A zone spanning pool is simpler to manage. Separate zone aligned pools provide more control over scaling, placement, and zonal storage.
 
 ![AKS node-pool availability-zone options](./images/nodeaz.png)
 
-##### Zone-spanning node pools
+##### Zone-spanning (Zone-Redundant) node pools
 
 In a zone-spanning node pool, AKS spreads nodes across all selected zones and balances the number of nodes between them. During a zone outage, nodes in the affected zone might become unavailable, while nodes in the remaining zones continue to operate.
 
@@ -151,12 +150,12 @@ az aks create --resource-group example-rg --name example-cluster --node-count 3 
 az aks nodepool add --resource-group example-rg --cluster-name example-cluster --name userpoola --node-count 6 --zones 1 2 3
 ```
 
-##### Zone-aligned node pools
+##### Zone-aligned (Zonal) node pools
 
-In a zone-aligned design, each node pool is pinned to a specific availability zone. I can use this approach when the workload needs lower latency between nodes in the same zone, more granular control over scaling, or deliberate cluster-autoscaler behavior for each zone.
+In a zone-aligned (Zonal) design, each node pool is pinned to a specific availability zone. I can use this approach when the workload needs lower latency between nodes in the same zone, more granular control over scaling, or deliberate cluster-autoscaler behavior for each zone.
 
 ```pwsh
-# Add three zone-aligned user node pools with two nodes in each zone
+# Add three zone-aligned (Zonal) user node pools with two nodes in each zone
 az aks nodepool add --resource-group example-rg --cluster-name example-cluster --name userpoolx --node-count 2 --zones 1
 
 az aks nodepool add --resource-group example-rg --cluster-name example-cluster --name userpooly --node-count 2 --zones 2
@@ -185,17 +184,79 @@ kubectl describe pod | grep -e "^Name:" -e "^Node:"
 
 ### Distribute pods across zones
 
-Spreading nodes across zones does not automatically guarantee that application pods are evenly distributed. I can use Kubernetes topology spread constraints to tell the scheduler how to place pod replicas across the available zones.
+Spreading nodes across zones Zone-spanning stratergy (Zone-Redundant) does not automatically guarantee that application pods are evenly distributed. I can use Kubernetes **topology spread constraints** to tell the scheduler how to place pod replicas across the available zones.
+
+This gives granular control over how pods are spread across your AKS cluster, taking into account regions, availability zones, and nodes. You can create constraints that span pod replicas across availability zones, as well as across different nodes within a single availability zone.
 
 The `topologyKey: topology.kubernetes.io/zone` setting tells Kubernetes to use the node's availability-zone label as the placement boundary. The `maxSkew: 1` setting controls how unevenly pods can be distributed between those zones.
 
 For example, with three available zones, three replicas, sufficient node capacity, and an appropriate scheduling constraint, a maximum skew of `1` helps place at least one replica in each zone.
+
+Benefits include:
+
+- Maximize the resilience and availability of your applications in the AKS cluster.
+- Optimizes resource utilization, minimizes downtime, and delivers a robust infrastructure for your workloads across multiple availability zones and nodes.
 
 ### Distribute inbound traffic
 
 AKS deploys an Azure Standard Load Balancer by default. It distributes inbound traffic to healthy backend nodes across the region. If a node becomes unavailable, the load balancer stops directing new traffic to that node and routes traffic to healthy nodes instead.
 
 > **Key Takeaway** Availability zones spread the infrastructure, but I still need to design node pools, pod placement, storage, and traffic routing so the application can survive a zone failure.
+
+## Workload and Storage Configuration
+
+Depending on the node pool strategy chosen there are considerations around workload deployment strategy and storage configuration.
+
+Overall for Azure Storage **data is always replicated 3 times in the primary region** so that your information is protected from planned and unplanned events. Redundancy ensures that your storage account meets its availability and durability targets even in case of failures.
+
+When planning the workload & storage redundency stratergy consider the tradeoffs between lower costs and higher availability. This is normally influenced by scenarios like how your data is replicated within the primary region, or do you want your data to be replicated to a second region that is geographically distant from the primary region, to protect against regional disasters (geo-replication) or does your application requires read access to the replicated data in the secondary region if the primary region becomes unavailable for any reason (geo-replication with read access).
+
+### Options for data replication in Primary region:
+
+* **Zone-redundant storage (ZRS)** disks replicate data across availability zones and provide greater flexibility during a zone failure.
+
+- Excellent performance, low latency, and resiliency for your data.
+- Replicates storage account synchronously across 3 Azure availability zones in the primary region you select.
+- ZRS disks provide at least 99.9999999999% (12 9’s) of durability over a given year.
+- Data is accessible for both read and write operations even if a zone becomes unavailable.
+- If a zone becomes unavailable, Azure does networking updates, such as DNS repointing.
+- Requires transient fault handling,  implementing retry policies with exponential back-off.
+- Write request happens synchronously.
+- Returns successfully only after the data is written to all replicas across the three availability zones.
+- If an availability zone is temporarily unavailable, the operation returns successfully after the data is written to all available zones.
+- A disk can be attached by a virtual machines in a different availability zone.
+
+ZRS is usefull if:
+
+- Require high availability
+- Want to restrict replication of data to a particular country or region to meet data governance requirements
+- Using Azure files workloads
+
+![zrs](./images/ZRS.png)
+
+> **Note** For protection against regional disasters, Microsoft recommends using geo-zone-redundant storage (GZRS), which uses ZRS in the primary region and also geo-replicates your data to a secondary region.
+
+* **Locally redundant storage (LRS)** disks remain in one zone and can attach only to nodes in that same zone.
+
+- Lowest cost option
+- Least durability
+- Protects customers data against server rack and drive failures
+- Write operations in LRS are synchronous
+- Write operatios are successful only after the data is written to all three replicas
+
+LRS is usefull if:
+
+- Storing data that can be easily reconstructed if data is lost
+- Using Azure unmanaged disks
+- Restrictions on replicating data within a country or region due to data governance requirements (GDPR)
+
+![LRS](./images/lrs.png)
+
+> **Note** Microsoft recommends using zone-redundant storage (ZRS), geo-redundant storage (GRS), or geo-zone-redundant storage (GZRS).
+
+* Stateful applications also need a plan for data replication, quorum (Quorum means a majority must remain available and agree before the system can safely continue.), and recovery during a zone failure.
+
+> **Key Takeaway** Customers Storage and workload stratergy also needs to match the node pool strategy
 
 ## Stateless and stateful applications
 
@@ -231,6 +292,25 @@ For stateless applications, a two-zone design is a supported resilient architect
 
 Stateful workloads need additional consideration. Workloads that require quorum might still need a three-zone design or additional multi-region protections to meet their availability and recovery requirements.
 
+## Managed disks with zone-spanning node pools
+
+When using a single zone-spanning node pool, it is recommended to use
+zone-redundant storage (ZRS) for persistent volumes. ZRS replicates the managed disk across availability zones, so the disk is not tied to only one zone.
+
+The application requests storage through a Kubernetes persistent volume claim
+(PVC). The PVC is then bound to a persistent volume backed by the ZRS managed
+disk. If the pod or its availability zone becomes unavailable, Kubernetes can
+reschedule the pod onto a healthy node in another zone and reattach the same
+disk.
+
+This provides better data availability and reliability than a locally
+redundant storage (LRS) disk, which can attach only to nodes in the same zone
+as the disk. For more information, see [Persistent volumes in
+Kubernetes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
+
+> **Key takeaway:** ZRS allows a persistent disk to follow a rescheduled pod
+> across availability zones. LRS keeps the pod and disk dependent on one zone.
+
 ## AKS Cluster: Zone-redundant Node pools
 
 An AKS cluster with zone redundant nde pools involves deploying an AKS cluster where the nodes are distributed evenly across the availability zones within a region.
@@ -257,47 +337,110 @@ This placement strategy improves fault tolerance and helps the application remai
 
 > **Notes:** Spreading nodes creates failure domains. Pod topology spread constraints make sure application replicas use them.
 
-## AKS Cluster: Zonal Node pools
+## AKS cluster: Zonal node pools
 
-For a zonal node pool stratergy customers would deploy the AKS cluster with 3 user node pools each assighned to a different availability zone within the current region.
+With a zonal node-pool strategy, customers deploy three user node pools and assign each pool to a different availability zone within the same Azure region. This provides direct control over the number of nodes available in each zone.
 
-The diagram below shows this architecture using a system-mode node pool and three zonal user-mode node pools, each located in a separate availability zone
+The following diagram shows this architecture with one system-mode node pool and three zonal user-mode node pools, each placed in a separate availability
+zone.
 
-![Zonal Node pools](./images/ZonalNodePools.png)
+![Zonal node pools](./images/ZonalNodePools.png)
 
-Deploy the script to create the following resources.
+Deploy the script to create the resources shown in the diagram.
 
-When creating a cluster using the ``az aks create`` command, the ``--zones`` parameter allows users to specify the availability zones for deploying agent nodes.
+### What the zones parameter controls
 
-However this parameter does not control the deployment of managed control plane components.
+When creating an AKS cluster with `az aks create`, the `--zones` parameter specifies the availability zones in which the nodes are deployed. This parameter controls node placement, but it does not control the placement of the managed AKS control-plane components.
 
-These components are automatically distributed across all available zones in the region during cluster deployment.
+Microsoft manages the control plane and automatically distributes its components across the available zones in the region during cluster deployment.
 
-Also in the script i have set the ``balance-similar-node-groups`` setting of the cluster autoscaler profile to ``true``. This is needed to make sure autoscaller can scale up and keep the sizes of the node pools balanced.
+### Balance similar node pools during scale-up
 
-Essentially the cluster autoscaler will automatically identify node groups with the same instance type and the same set of labels (except for automatically added zone label) and tries to keep the sizes of those node groups balanced.
+In the script, I set the cluster autoscaler profile setting `balance-similar-node-groups` to `true`. This helps the cluster autoscaler keep similar zonal node pools balanced when it adds capacity.
 
-However, this doesnt guarantee similiar node pools will have exactly the same size.
+The cluster autoscaler identifies node pools that use the same VM size and the same set of labels, excluding the zone label that Azure adds automatically. It then attempts to distribute new nodes across those similar pools.
 
-- Balancing is only done at scale up: The cluster autoscaler will still scale down underutilized nodes regardless of the relative sizes of underlying node groups.
-- The cluster autoscaler will only add as many nodes as required to run all existing pods. If the number of nodes is not divisible by the number of balanced node pools, some groups will get 1 more node than others
-- Cluster Autoscaler will only balance between node groups that can support the same set of pending pods. If you run pods that can only go to a single node group (for example due to nodeSelector on zone label) Cluster Autoscaler will only add nodes to this particular node group.
-- Can opt-out a node group from being automatically balanced with other node groups using the same instance type by giving it any custom labe
+This setting improves balance during scale-up, but it does not guarantee that the node pools will always contain exactly the same number of nodes. The following limitations still apply:
+
+* Balancing occurs only during scale-up. During scale-down, the cluster autoscaler can remove underused nodes regardless of the relative sizes of the node pools.
+* The autoscaler adds only the number of nodes required to schedule the pending pods. If that number cannot be divided evenly between the balanced node pools, one or more pools might contain an extra node.
+* The autoscaler balances only node pools that can run the same pending pods. For example, if a pod uses a `nodeSelector` that restricts it to one zone, the autoscaler adds capacity only to the node pool in that zone.
+* A node pool can be excluded from balancing with otherwise similar pools by assigning it a different custom label.
+
+> **Key Takeaway:** Separate zonal node pools provide direct control over each zone. The autoscaler can help balance similar pools during scale-up, but workload scheduling requirements still determine where capacity is added.
 
 ## How a two-zone AKS deployment remains resilient
 
 > [!NOTE]
-> A two-zone AKS deployment remains resilient to a single-zone outage because
-> AKS can distribute node pools across both zones and continue serving
-> workloads from the surviving zone.
+> A two-zone AKS deployment remains resilient to a single-zone outage because AKS can distribute node pools across both zones and continue serving workloads from the surviving zone.
 
-The capacity impact of a zone failure differs between two-zone and three-zone
-designs:
+When creating AKS node pools, customers might find that the same VM family is not available in every zone for their subscription because of capacity constraints. This becomes a problem when the target architecture expects one zone-spanning node pool to use the same VM SKU across three availability zones to create a resilient, fault tolerant AKS cluster.
+
+The capacity impact of a zone failure differs between two-zone and three-zone designs:
 
 | Design      | Approximate capacity lost during one zone failure | Approximate capacity remaining |
 |-------------|---------------------------------------------------|--------------------------------|
 | Two zones   | 50%                                               | 50%                            |
 | Three zones | 33%                                               | 67%                            |
+
+One workaround is to use one VM SKU in a node pool that spans the accessible zones, then create another node pool with a different SKU in the constrained zone. This still provides capacity across zones, but each node pool becomes a separate scaling domain.
+
+The AKS cluster autoscaler feature optimizes capacity within each pool, but it does not freely move or rebalance existing capacity between pools. Multiple pools can therefore result in more nodes than required, higher compute or per-VM licensing costs, and additional upgrade and administration work.
+
+AKS provides two features that can make capacity-constrained deployments more practical:
+
+* [Automatic zone placement](https://learn.microsoft.com/en-us/azure/aks/configure-automatic-zone-placement) improves placement and scaling across the zones that support a selected VM SKU.
+* **Node auto-provisioning (NAP)** evaluates pending pod requirements and can provision nodes from an allowed set of VM families, SKUs, and zones.
+
+These features provide more placement flexibility, but they **do not create capacity where the underlying Azure capacity is unavailable**.
+
+### Automatic zone placement in AKS
+
+Automatic zone placement is a preview feature that dynamically selects the best availability zones for a node pool. Instead of specifying zones manually, customers can use `--zones auto`. AKS then uses the Azure Compute automatic zone placement policy to find zones that support the requested VM SKU applying a **maximum instance percentage of 50% per zone** .
+
+The placement flow works as follows:
+
+1. AKS checks which availability zones in the target region support the requested VM SKU.
+2. AKS initially selects up to three supported zones and distributes nodes according to the placement policy.
+3. By default, no single zone can contain more than 50% of the node pool.
+4. During later scale-out operations, AKS checks zone availability again. If a new zone becomes available or the VM SKU becomes available in another zone, AKS can place new nodes there without requiring a node-pool configuration change.
+
+The 50% limit controls the maximum concentration in one zone. It does not guarantee that every zone will contain exactly the same number of nodes. The actual distribution still depends on node count, SKU support, and available capacity, and an allocation can still fail if Azure cannot satisfy the request.
+
+Automatic zone placement supports creating and updating both Virtual Machine Scale Sets-based and Virtual Machines-based node pools. It is intended for zone-spanning (Zone-Redundant) node pools. Zone-aligned pools should continue to specify their zone explicitly.
+
+### Node auto-provisioning
+
+Node auto-provisioning keeps an AKS cluster efficient by creating nodes for pending pods and removing nodes when it is safe to do so allowing customers to create a workaround to capacity constraints. NAP evaluates pod resource requests and the requirements defined in its Kubernetes `NodePool` resources, then provisions nodes that satisfy the workload and policy constraints.
+
+Unlike a traditional Virtual Machine Scale Sets node pool, which remains tied to one VM SKU, a NAP `NodePool` can allow multiple VM families or specific SKUs. NAP can then choose an eligible VM for each new node based on CPU, memory, GPU, zone, capacity, and other configured requirements.
+
+NAP uses two layers of control when deciding whether a node can be removed:
+
+* The **workload layer** uses Pod Disruption Budgets (PDBs). PDBs limit voluntary pod evictions by defining how many replicas must remain available or how many can be unavailable at one time.
+* The **infrastructure layer** uses node-level disruption settings. These controls limit how quickly NAP can disrupt and replace nodes.
+
+A NAP disruption is a voluntary action that drains and removes a node. Common examples include:
+
+* **Consolidation** removes or replaces nodes with more suitable VM sizes to improve compute efficiency and reduce cost.
+* **Drift** replaces nodes that no longer match the desired `NodePool` or `AKSNodeClass` configuration.
+* **Expiration** replaces nodes after a configured lifetime.
+
+Involuntary disruptions, such as Spot evictions, hardware failures, and host reboots, are not initiated by NAP and must still be included in the workload's resilience design.
+
+When pods remain pending, NAP first checks whether they fit on existing nodes. If they do not, it evaluates their CPU, memory, GPU, affinity, topology, and other requirements. It then searches the allowed VM families and SKUs and provisions an option that meets those requirements and the configured policy. Allowing a broad but controlled set of suitable VM sizes reduces the chance of provisioning failures when one SKU has limited capacity and gives NAP more flexibility to select an alternative SKU that still meets the workload requirements and policy constraints.
+
+The ability to use multiple SKUs depends on the AKS node pool model. VM node pools and Node Auto Provisioning both support this flexibility, but they are mutually exclusive approaches. With NAP, AKS provisions and manages standalone VMs rather than relying on traditional node pools, which enables mixed-SKU autoscaling. VM node pools, on the other hand, still use the traditional node pool model but allow mixed-SKU manual scaling.
+
+### Cluster autoscaler compared with NAP
+
+As discussed, the cluster autoscaler scales existing node pools. Acting as the standard autoscaling method for Kubernetes and works by scaling pre-existing node pools of the same VM size. Because a traditional Virtual Machine Scale Sets pool uses one VM SKU, the autoscaler cannot switch that pool to another SKU when capacity is unavailable. To work around this customers might need multiple pools with different SKUs and zones to avoid capacity exhaustion, which adds operational overhead.In some cases, it can almost become a pattern of needing one node pool per zone for each VM SKU to scale reliably.
+
+This is where NAP is particularly valuable. NAP works at the individual node level and can select from the VM options allowed by its `NodePool` requirements. This gives it more flexibility to respond to pod pressure and capacity changes and can improve both capacity resilience and cost efficiency.
+
+The important distinction is that a NAP `NodePool` is a Kubernetes provisioning policy, not a traditional VMSS Uniform node pool. VMSS Uniform pools remain single-SKU by design. Their SKU can be changed through a supported update, but multiple SKUs cannot coexist in the same VMSS Uniform pool.
+
+> **Key takeaway:** Automatic zone placement finds suitable zones for one VM SKU. NAP can choose suitable nodes from multiple allowed VM options. Neither feature removes the need for available Azure capacity, quota, and resilient workload design.
 
 ## Capacity assurance with ODCR
 
@@ -352,15 +495,31 @@ The engagment produced several important takeaways:
 * Customers should therfore focus on sizing the node pools so the surviving zone can support critical workloads, along with using autoscaling and Kubernetes workload distribution controls
 * Focus on distributing AKS node pools evenly across both zones and  consider On Demand Capacity Reservation for the required baseline capacity
 
-## Testing Demo
+## Testing demo
 
-After deploying scripts, we can simulate a scenario where the agent nodes in a specific availability zone suddenly become unavailable due to a failure. The aim of the demo is to verify that the application continues to run successfully on the agent nodes in the other availability zones. To prevent interference from the cluster autoscaler during the test and make sure  each zonal node pool has exactly two agent nodes, you can run the script in the test folder. This script disables the cluster autoscaler on each node pool and manually sets the number of nodes to two for each of them
+After deploying the scripts, I can simulate a failure that makes all  nodes in one availability zone unavailable. The aim of this demo is to verify that the application continues running on nodes in the remaining healthy zones.
 
-![pods are distributed across the agent nodes and zonal node pools](./images/LocallyRedundantStorage.png)
+### Prepare the node pools
 
-The diagrma shows how the pods are distributed evenly across the zonal node pools, each within a separate availability zone, ensuring high availability and fault tolerance.
+Before starting the test, I need to prevent the cluster autoscaler from changing the node count and affecting the result. The script in the test folder prepares the cluster by:
 
-Each pod is associated with an LRS managed disk that is located in the same availability zone as the pod. This leads to optimal data locality and minimizes network latency for disk operations. Overall, this distribution strategy increases the resiliency and performance of the system, providing a reliable and efficient deployment architecture.
+* Disabling the cluster autoscaler on each zonal node pool
+* Manually setting each zonal node pool to exactly two nodes
+
+This creates a consistent starting point and makes it easier to observe how the application responds when one zone becomes unavailable.
+
+### Expected pod and storage distribution
+
+![Pods distributed across nodes and zonal node pools](./images/LocallyRedundantStorage.png)
+
+The diagram shows the pods distributed evenly across zonal node pools, with each node pool located in a separate availability zone. This placement helps maintain application availability and fault tolerance during a zonal failure.
+
+Each pod uses a locally redundant storage (LRS) managed disk located in the same availability zone as the pod. Keeping the pod and its disk in the same zone provides data locality and minimizes latency for disk operations.
+
+During the test, the expected result is that workloads in the failed zone are affected, while pods and disks in the remaining zones continue operating. This distribution demonstrates how zonal node pools and zone-aligned storage can improve application resilience and performance.
+
+> **Memory line:** Fix the node count before the test, remove one zone, and
+> confirm that workloads in the healthy zones continue running.
 
 ## Troubleshooting
 
@@ -371,3 +530,6 @@ Each pod is associated with an LRS managed disk that is located in the same avai
 * [zone-redundant-aks-and-storage](https://github.com/Azure-Samples/zone-redundant-aks-and-storage)
 * [Cluster autoscaler profile settings](https://learn.microsoft.com/en-us/azure/aks/cluster-autoscaler?tabs=azure-cli#cluster-autoscaler-profile-settings)
 * [Autoscaler](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#im-running-cluster-with-nodes-in-multiple-zones-for-ha-purposes-is-that-supported-by-cluster-autoscaler)
+* [Cluster Autoscaler in Azure Kubernetes Service (AKS)](https://learn.microsoft.com/en-us/azure/aks/cluster-autoscaler-overview)
+* [Configure node pools for node auto-provisioning (NAP) in Azure Kubernetes Service (AKS)](https://learn.microsoft.com/en-us/azure/aks/node-auto-provisioning-node-pools)
+[Navigating Capacity Challenges on AKS with Node Auto Provisioning or Virtual Machine Node Pools](https://blog.aks.azure.com/2025/12/06/node-auto-provisioning-capacity-management)
