@@ -10,20 +10,20 @@ description: Guidance on designing a zone-resilient AKS clusters, including node
 | [Introduction](#introduction) | Why resilience planning matters and what these notes cover |
 | [Background](#background) | Customer scenario and reason for the engagement |
 | [Customer requirements and constraints](#customer-requirements-and-constraints) | Regional dependencies and capacity limitations |
-| [Availability zones](#availability-zones) | How availability zones provide isolation within an Azure region |
+| [Understanding Azure availability zones](#understanding-azure-availability-zones) | How availability zones provide isolation within an Azure region |
 | [Zone-resilient deployment types](#zone-resilient-deployment-types) | Difference between zonal and zone-redundant resources |
-| [Availability zones in AKS](#availability-zones-in-azure-kubernetes-service-aks) | Control plane, node pools, pod placement, and traffic distribution |
+| [How AKS uses availability zones](#how-aks-uses-availability-zones) | Control plane, node pools, pod placement, and traffic distribution |
 | [Stateless and stateful applications](#stateless-and-stateful-applications) | Simple explanation of the two workload types |
 | [Workload and storage configuration](#workload-and-storage-configuration) | Storage redundancy choices and workload considerations |
 | [Managed disks with zone-spanning node pools](#managed-disks-with-zone-spanning-node-pools) | Using ZRS persistent volumes for cross-zone recovery |
-| [AKS cluster: Zone-redundant node pools](#aks-cluster-zone-redundant-node-pools) | Zone-spanning node pools and pod topology spread constraints |
-| [AKS cluster: Zonal node pools](#aks-cluster-zonal-node-pools) | Zone-aligned node pools and autoscaler balancing |
+| [Zone spanning (Zone-redundant) AKS node pool architecture](#zone-spanning-zone-redundant-aks-node-pool-architecture) | Zone-spanning node pools and pod topology spread constraints |
+| [Zone-aligned (Zonal) AKS node-pool architecture](#zone-aligned-zonal--aks-node-pool-architecture) | Zone-aligned node pools and autoscaler balancing |
 | [How a two-zone AKS deployment remains resilient](#how-a-two-zone-aks-deployment-remains-resilient) | Capacity impact of a zone failure |
-| [Capacity assurance with ODCR](#capacity-assurance-with-odcr) | Guaranteed capacity and commercial considerations |
-| [Multi-region deployments](#multi-region-deployments) | Cross-region resilience, disaster recovery, and business continuity |
-| [Architecture decision guidance](#architecture-decision-guidance) | Questions to guide the final design |
-| [Testing demo](#testing-demo) | Simulate a zonal failure and verify workload resilience |
-| [Key takeaways](#key-takeaways) | Main lessons from the discussion |
+| [Guaranteeing capacity with ODCR](#guaranteeing-capacity-with-odcr) | Guaranteed capacity and commercial considerations |
+| [Extending resilience across regions](#extending-resilience-across-regions) | Cross-region resilience, disaster recovery, and business continuity |
+| [Choosing an AKS resilience strategy](#choosing-an-aks-resilience-strategy) | Questions to guide the final design |
+| [Testing resilience during a zone failure](#testing-resilience-during-a-zone-failure) | Simulate a zonal failure and verify workload resilience |
+| [Key design takeaways](#key-design-takeaways) | Main lessons from the discussion |
 | [Troubleshooting](#troubleshooting) | Common issues and investigation guidance |
 | [References](#references) | Supporting documentation and examples |
 
