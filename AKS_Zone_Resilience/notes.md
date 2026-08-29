@@ -13,8 +13,8 @@ description: Guidance on designing a zone-resilient AKS clusters, including node
 | [Availability zones](#availability-zones) | How availability zones provide isolation within an Azure region |
 | [Zone-resilient deployment types](#zone-resilient-deployment-types) | Difference between zonal and zone-redundant resources |
 | [Availability zones in AKS](#availability-zones-in-azure-kubernetes-service-aks) | Control plane, node pools, pod placement, and traffic distribution |
-| [Workload and storage configuration](#workload-and-storage-configuration) | Storage redundancy choices and workload considerations |
 | [Stateless and stateful applications](#stateless-and-stateful-applications) | Simple explanation of the two workload types |
+| [Workload and storage configuration](#workload-and-storage-configuration) | Storage redundancy choices and workload considerations |
 | [Managed disks with zone-spanning node pools](#managed-disks-with-zone-spanning-node-pools) | Using ZRS persistent volumes for cross-zone recovery |
 | [AKS cluster: Zone-redundant node pools](#aks-cluster-zone-redundant-node-pools) | Zone-spanning node pools and pod topology spread constraints |
 | [AKS cluster: Zonal node pools](#aks-cluster-zonal-node-pools) | Zone-aligned node pools and autoscaler balancing |
@@ -22,8 +22,8 @@ description: Guidance on designing a zone-resilient AKS clusters, including node
 | [Capacity assurance with ODCR](#capacity-assurance-with-odcr) | Guaranteed capacity and commercial considerations |
 | [Multi-region deployments](#multi-region-deployments) | Cross-region resilience, disaster recovery, and business continuity |
 | [Architecture decision guidance](#architecture-decision-guidance) | Questions to guide the final design |
-| [Key takeaways](#key-takeaways) | Main lessons from the discussion |
 | [Testing demo](#testing-demo) | Simulate a zonal failure and verify workload resilience |
+| [Key takeaways](#key-takeaways) | Main lessons from the discussion |
 | [Troubleshooting](#troubleshooting) | Common issues and investigation guidance |
 | [References](#references) | Supporting documentation and examples |
 
@@ -53,7 +53,7 @@ The engagement highlighted the following requirements and constraints:
     including South Central.
 * Moving to another region could provide different capacity options, but the effect on existing infrastructure dependencies would need to be evaluated.
 
-## Availability Zones
+## Understanding Azure availability zones
 
 An availability zone is a seperate group of datacenters in a region. Key benefits include been close enough to have a **fast connection** to each other and **low latency**, but far enough to reduce the chances of all zones been affected by a local issue. Each availability zone has its own power, cooling, and networking systems and if one zone goes down, the other zones can still support regional services, capacity, and high availability. All of this to make sure your data remains accesible and in sync during unexpected events. Important to note not all the Azure regions support availability zones.
 
@@ -87,7 +87,7 @@ To find out more about which services support what, you can refer to [Azure serv
 
 > **Key distinction:** With zonal resources, the customer designs and manages cross-zone resilience. With zone-redundant resources, Microsoft manages it as part of the service.
 
-## Availability zones in Azure Kubernetes Service (AKS)
+## How AKS uses availability zones
 
 An availability zone is a separate physical location within an Azure region. Each zone contains one or more datacenters with independent power, cooling, and networking. This separation helps protect applications and data from a failure in a single datacenter or zone.
 
@@ -203,6 +203,40 @@ AKS deploys an Azure Standard Load Balancer by default. It distributes inbound t
 
 > **Key Takeaway** Availability zones spread the infrastructure, but I still need to design node pools, pod placement, storage, and traffic routing so the application can survive a zone failure.
 
+## Stateless and stateful applications
+
+In simple terms, the difference is whether the application needs to remember information locally between requests:
+
+* A **stateless application** does not depend on information stored inside a
+     specific application instance or pod. Each request can be handled
+     independently by any available pod. If one pod fails, another pod can take
+     over without needing to recover information from the failed pod.
+* A **stateful application** needs to preserve information between requests or
+     depends on a stable identity, ordered processing, or persistent storage. If
+     its pod fails, the replacement might need to reconnect to its storage,
+     recover data, or rejoin the other application replicas before it can serve
+     traffic safely.
+
+| Characteristic | Stateless application | Stateful application |
+| --- | --- | --- |
+| Simple analogy | A receptionist who can handle the next request without knowing the previous conversation | A personal account manager who must retain the customer's history |
+| Common examples | Web front ends, REST APIs, and request-processing services | Databases, message brokers, and applications that store local session data |
+| Where data is kept | In an external service, such as a database, distributed cache, or object store | In persistent storage or replicated state managed by the application |
+| If a pod fails | Another pod can usually serve the next request immediately | A replacement might need to restore data, attach storage, or rejoin a replica group |
+| Scaling | Usually straightforward because any replica can handle a request | Requires care to preserve data consistency, identity, and replica membership |
+| Zone outage concern | Enough healthy pods and compute capacity must remain in the surviving zone | Data replicas, storage availability, quorum, and recovery behavior must also survive |
+
+> **Memory line:** Stateless applications can replace a pod and continue;
+> stateful applications must also preserve and recover what the pod knows.
+
+For stateless applications, a two-zone design is a supported resilient architecture when the application can absorb the capacity reduction through one or more of the following measures:
+
+* Autoscaling
+* Load shedding
+* Deliberate overprovisioning
+
+Stateful workloads need additional consideration. Workloads that require quorum might still need a three-zone design or additional multi-region protections to meet their availability and recovery requirements.
+
 ## Workload and Storage Configuration
 
 Depending on the node pool strategy chosen there are considerations around workload deployment strategy and storage configuration.
@@ -258,60 +292,17 @@ LRS is usefull if:
 
 > **Key Takeaway** Customers Storage and workload stratergy also needs to match the node pool strategy
 
-## Stateless and stateful applications
-
-In simple terms, the difference is whether the application needs to remember information locally between requests:
-
-* A **stateless application** does not depend on information stored inside a
-     specific application instance or pod. Each request can be handled
-     independently by any available pod. If one pod fails, another pod can take
-     over without needing to recover information from the failed pod.
-* A **stateful application** needs to preserve information between requests or
-     depends on a stable identity, ordered processing, or persistent storage. If
-     its pod fails, the replacement might need to reconnect to its storage,
-     recover data, or rejoin the other application replicas before it can serve
-     traffic safely.
-
-| Characteristic | Stateless application | Stateful application |
-| --- | --- | --- |
-| Simple analogy | A receptionist who can handle the next request without knowing the previous conversation | A personal account manager who must retain the customer's history |
-| Common examples | Web front ends, REST APIs, and request-processing services | Databases, message brokers, and applications that store local session data |
-| Where data is kept | In an external service, such as a database, distributed cache, or object store | In persistent storage or replicated state managed by the application |
-| If a pod fails | Another pod can usually serve the next request immediately | A replacement might need to restore data, attach storage, or rejoin a replica group |
-| Scaling | Usually straightforward because any replica can handle a request | Requires care to preserve data consistency, identity, and replica membership |
-| Zone outage concern | Enough healthy pods and compute capacity must remain in the surviving zone | Data replicas, storage availability, quorum, and recovery behavior must also survive |
-
-> **Memory line:** Stateless applications can replace a pod and continue;
-> stateful applications must also preserve and recover what the pod knows.
-
-For stateless applications, a two-zone design is a supported resilient architecture when the application can absorb the capacity reduction through one or more of the following measures:
-
-* Autoscaling
-* Load shedding
-* Deliberate overprovisioning
-
-Stateful workloads need additional consideration. Workloads that require quorum might still need a three-zone design or additional multi-region protections to meet their availability and recovery requirements.
-
 ## Managed disks with zone-spanning node pools
 
-When using a single zone-spanning node pool, it is recommended to use
-zone-redundant storage (ZRS) for persistent volumes. ZRS replicates the managed disk across availability zones, so the disk is not tied to only one zone.
+When using a single zone-spanning node pool, it is recommended to use zone-redundant storage (ZRS) for persistent volumes. ZRS replicates the managed disk across availability zones, so the disk is not tied to only one zone.
 
-The application requests storage through a Kubernetes persistent volume claim
-(PVC). The PVC is then bound to a persistent volume backed by the ZRS managed
-disk. If the pod or its availability zone becomes unavailable, Kubernetes can
-reschedule the pod onto a healthy node in another zone and reattach the same
-disk.
+The application requests storage through a Kubernetes persistent volume claim (PVC). The PVC is then bound to a persistent volume backed by the ZRS managed disk. If the pod or its availability zone becomes unavailable, Kubernetes can reschedule the pod onto a healthy node in another zone and reattach the same disk.
 
-This provides better data availability and reliability than a locally
-redundant storage (LRS) disk, which can attach only to nodes in the same zone
-as the disk. For more information, see [Persistent volumes in
-Kubernetes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
+This provides better data availability and reliability than a locally redundant storage (LRS) disk, which can attach only to nodes in the same zone as the disk. For more information, see [Persistent volumes in Kubernetes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
 
-> **Key takeaway:** ZRS allows a persistent disk to follow a rescheduled pod
-> across availability zones. LRS keeps the pod and disk dependent on one zone.
+> **Key takeaway:** ZRS allows a persistent disk to follow a rescheduled pod across availability zones. LRS keeps the pod and disk dependent on one zone.
 
-## AKS Cluster: Zone-redundant Node pools
+## Zone spanning (Zone-redundant) AKS node pool architecture
 
 An AKS cluster with zone redundant nde pools involves deploying an AKS cluster where the nodes are distributed evenly across the availability zones within a region.
 
@@ -337,7 +328,7 @@ This placement strategy improves fault tolerance and helps the application remai
 
 > **Notes:** Spreading nodes creates failure domains. Pod topology spread constraints make sure application replicas use them.
 
-## AKS cluster: Zonal node pools
+## Zone-aligned (Zonal ) AKS node-pool architecture
 
 With a zonal node-pool strategy, customers deploy three user node pools and assign each pool to a different availability zone within the same Azure region. This provides direct control over the number of nodes available in each zone.
 
@@ -442,7 +433,7 @@ The important distinction is that a NAP `NodePool` is a Kubernetes provisioning 
 
 > **Key takeaway:** Automatic zone placement finds suitable zones for one VM SKU. NAP can choose suitable nodes from multiple allowed VM options. Neither feature removes the need for available Azure capacity, quota, and resilient workload design.
 
-## Capacity assurance with ODCR
+## Guaranteeing capacity with ODCR
 
 On-demand capacity reservation (ODCR) was discussed as an alternative for guaranteeing AKS compute capacity. It is the only guaranteed method of reserving capacity in Azure and is suitable for workloads that run 24 hours a day, seven days a week.
 
@@ -454,7 +445,7 @@ An ODCR can be configured in the Azure portal by creating a capacity reservation
 
 Before choosing ODCR, it is important to establish the customer's actual capacity requirements. Quota approvals are region-based and must be managed carefully while supply remains constrained.
 
-## Multi-region deployments
+## Extending resilience across regions
 
 Another option I learned to consider is deploying the application across multiple Azure regions. A multi-region architecture can achieve many of the same goals as a multi-zone design, including high availability, resilience, and greater scalability. However, it protects against a broader failure scope because the application is not dependent on a single Azure region.
 
@@ -469,7 +460,7 @@ For this reason, customers should consider multi-region options for critical app
 
 > **Key Takeaway:** Availability zones protect against failures within a region. A multi-region design adds protection against the loss of an entire region.
 
-## Architecture decision guidance
+## Choosing an AKS resilience strategy
 
 The architecture discussion should consider the following questions:
 
@@ -482,20 +473,7 @@ The architecture discussion should consider the following questions:
 
 For this customer, the key message was that a two-zone AKS architecture can provide supported single-zone-failure resilience. The final choice should be based on workload behavior, capacity-loss tolerance, stateful quorum needs, regional dependencies, and the cost of guaranteed capacity.
 
-## Key takeaways
-
-The engagment produced several important takeaways:
-
-* Due to global supply constraints, the industry is increasingly adopting two-zone architectures as a standard approach. Azure documentation and services are being updated to reflect this shift.
-* The service-level agreement (SLA) for a two-zone deployment is effectively the same as the SLA for a three-zone deployment within a single region.
-* Customers need clear guidance about the negligible SLA difference and the operational benefits of a two-zone deployment.
-* The primary architectural tradeoff is the amount of capacity lost during a zone failure, rather than a significant difference in the regional SLA.
-* A two-zone design still provides resilience against the loss of a single zone.
-* The main tradeoff is capacity during a zone failure as in a two-zone design, losing one zone removes roughly 50% of the cluster’s in region compute capacity, versus roughly 33% in a three-zone design
-* Customers should therfore focus on sizing the node pools so the surviving zone can support critical workloads, along with using autoscaling and Kubernetes workload distribution controls
-* Focus on distributing AKS node pools evenly across both zones and  consider On Demand Capacity Reservation for the required baseline capacity
-
-## Testing demo
+## Testing resilience during a zone failure
 
 After deploying the scripts, I can simulate a failure that makes all  nodes in one availability zone unavailable. The aim of this demo is to verify that the application continues running on nodes in the remaining healthy zones.
 
@@ -520,6 +498,26 @@ During the test, the expected result is that workloads in the failed zone are af
 
 > **Memory line:** Fix the node count before the test, remove one zone, and
 > confirm that workloads in the healthy zones continue running.
+
+## Key design takeaways
+
+The engagement produced several important takeaways:
+
+* Due to global supply constraints, the industry is increasingly adopting two-zone architectures as a standard approach. Azure documentation and services are being updated to reflect this shift.
+* The service-level agreement (SLA) for a two-zone deployment is effectively the same as the SLA for a three-zone deployment within a single region.
+* Customers need clear guidance about the negligible SLA difference and the operational benefits of a two-zone deployment.
+* A two-zone design still provides resilience against the loss of a single zone. The main architectural tradeoff is capacity: losing one zone removes roughly 50% of the cluster's in-region compute capacity, compared with roughly 33% in a three-zone design.
+* Customers should size node pools so that the surviving zone can continue supporting critical workloads. Autoscaling, load shedding, and deliberate overprovisioning can help manage the loss of capacity.
+* Spreading nodes across availability zones does not automatically spread application pods. Customers should use topology spread constraints or affinity rules to distribute replicas across zones and nodes.
+* A resilient AKS cluster does not automatically make the application resilient. Pod placement, storage, networking, dependent services, and disruption controls must all be designed for zonal failure.
+* The storage strategy must match the node-pool strategy. ZRS managed disks support cross-zone recovery, while LRS disks remain tied to nodes in the same availability zone.
+* Zone-spanning node pools are simpler to manage. Separate zone-aligned node pools provide more control over scaling, workload placement, and zonal storage, but they also create additional operational overhead.
+* Separate node pools are separate scaling domains. The cluster autoscaler can optimize each pool, but it does not freely rebalance existing capacity between pools.
+* Automatic zone placement can find suitable zones for one VM SKU, while NAP can select nodes from multiple allowed VM options. Neither feature can create Azure capacity or quota where it is unavailable.
+* On-demand capacity reservation should be considered when guaranteed baseline capacity is required, particularly for workloads that run continuously.
+* Stateful workloads require additional planning for data replication, quorum, persistent storage, and recovery behavior during a zone failure.
+* Availability zones protect workloads from failures within one region. Critical workloads should also consider a multi-region design for protection against a full regional outage.
+* Resilience should be tested. A controlled zonal-failure exercise confirms whether workloads, storage, and traffic continue operating from the healthy zones as expected.
 
 ## Troubleshooting
 
