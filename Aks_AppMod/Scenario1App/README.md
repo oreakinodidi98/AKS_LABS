@@ -27,18 +27,51 @@ Install these local tools before you continue:
 * PostgreSQL 15 or later
 * PowerShell
 
+Open PowerShell, move to the application directory, and locate the PostgreSQL tools:
+
+```powershell
+cd C:\AKS_LABS\AKS_AppMod\Scenario1App
+$pgBin = (Get-ChildItem 'C:\Program Files\PostgreSQL\*\bin' -Directory |
+	Sort-Object FullName -Descending |
+	Select-Object -First 1 -ExpandProperty FullName)
+
+if (-not $pgBin) {
+	throw 'PostgreSQL was not found. Install PostgreSQL 15 or later before continuing.'
+}
+
+& "$pgBin\psql.exe" --version
+& "$pgBin\pg_isready.exe" --host 127.0.0.1 --port 5432
+```
+
+The readiness command must report `accepting connections`.
+
 ## Create the Python environment
 
 Run these commands from the `Scenario1App` directory. Both applications use one local
 virtual environment so their dependencies remain isolated from your system Python.
 
 ```powershell
-cd CaldovaClinicalApi
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install --requirement requirements.txt
-.venv\Scripts\python.exe -m pip install --requirement ..\CaldovaClinicalWeb\requirements.txt
-cd ..
+python -m venv CaldovaClinicalApi\.venv
+$venvPython = Resolve-Path CaldovaClinicalApi\.venv\Scripts\python.exe
+& $venvPython -m pip install --upgrade pip
+& $venvPython -m pip config --site set global.index-url https://pypi.org/simple
+& $venvPython -m pip install --requirement CaldovaClinicalApi\requirements.txt
+& $venvPython -m pip install --requirement CaldovaClinicalWeb\requirements.txt
 ```
+
+The venv-scoped index setting overrides an outdated machine-wide pip index without
+changing other projects. If pip reports a TLS error, run these checks:
+
+```powershell
+& $venvPython -m pip config debug
+Invoke-WebRequest https://pypi.org/simple/ -Method Head
+Invoke-WebRequest https://files.pythonhosted.org/ -Method Head
+```
+
+Both requests must succeed. A failure for `files.pythonhosted.org` indicates a local
+network, proxy, firewall, or HTTPS inspection issue. Use an approved network or ask
+your administrator for the required trusted root certificate and proxy settings. Do
+not bypass certificate validation with `--trusted-host`.
 
 ## Initialize PostgreSQL
 
@@ -46,8 +79,29 @@ Create the `drugs` database and apply the idempotent schema. The PostgreSQL comm
 prompt for the `postgres` account password when required.
 
 ```powershell
-createdb --host 127.0.0.1 --port 5432 --username postgres drugs
-psql --host 127.0.0.1 --port 5432 --username postgres --dbname drugs --file CaldovaClinicalApi\db\init.sql
+$databaseExists = & "$pgBin\psql.exe" `
+	--host 127.0.0.1 `
+	--port 5432 `
+	--username postgres `
+	--dbname postgres `
+	--tuples-only `
+	--no-align `
+	--command "SELECT 1 FROM pg_database WHERE datname = 'drugs';"
+
+if ($databaseExists.Trim() -ne '1') {
+	& "$pgBin\createdb.exe" `
+		--host 127.0.0.1 `
+		--port 5432 `
+		--username postgres `
+		drugs
+}
+
+& "$pgBin\psql.exe" `
+	--host 127.0.0.1 `
+	--port 5432 `
+	--username postgres `
+	--dbname drugs `
+	--file CaldovaClinicalApi\db\init.sql
 ```
 
 Running the SQL file more than once is safe. Existing seed records are preserved.
