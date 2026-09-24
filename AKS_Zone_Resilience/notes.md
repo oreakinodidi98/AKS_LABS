@@ -89,8 +89,6 @@ To find out more about which services support what, you can refer to [Azure serv
 
 ## How AKS uses availability zones
 
-An availability zone is a separate physical location within an Azure region. Each zone contains one or more datacenters with independent power, cooling, and networking. This separation helps protect applications and data from a failure in a single datacenter or zone.
-
 Enabling availability zones in AKS distributes nodes across physically separate datacenters within the same region. If one zone fails, nodes in the other zones can continue running. Deploying AKS nodes across multiple zones does not add an AKS-specific charge, but the application still needs the right pod placement, storage, volume, and load-balancing configuration to benefit from that distribution.
 
 Some workloads also have **co-location requirements**. This means that related resources need to run in the same availability zone. For example, an application might need its pod close to another service to reduce latency, or a pod might need to run in the same zone as the zonal disk it uses. These requirements affect if customers can spread one node pool across zones or create separate node pools aligned to specific zones.
