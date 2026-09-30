@@ -1,0 +1,20 @@
+name: ARC AKS Automatic validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: arc-auto-runners
+    steps:
+      - name: Print runner context
+        run: |
+          echo "ARC runner reached workflow execution"
+          echo "Runner name: $RUNNER_NAME"
+          uname -a
+          df -h
+
+      - name: Exercise container tooling
+        run: |
+          docker --version || true
+          echo "Validation complete"
