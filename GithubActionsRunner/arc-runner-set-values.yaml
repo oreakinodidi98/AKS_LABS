@@ -1,7 +1,15 @@
-githubConfigUrl: $env:GITHUB_CONFIG_URL
 githubConfigSecret: github-pat
 minRunners: 0
 maxRunners: 3
+
+controllerServiceAccount:
+  namespace: arc-systems
+  name: arc-gha-rs-controller
+
+listenerMetrics:
+  gauges:
+    gha_desired_runners:
+      labels: ["name", "namespace", "repository", "organization", "enterprise"]
 
 listenerTemplate:
   spec:
@@ -12,8 +20,20 @@ listenerTemplate:
             cpu: 100m
             memory: 128Mi
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
 
 template:
   spec:
