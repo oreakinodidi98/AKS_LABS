@@ -1,0 +1,44 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">AKS Baseline Application</h1>
+    <p>Sample web application for AKS baseline architecture.</p>
+</div>
+
+<div class="container mt-5">
+    <h2>Products</h2>
+    
+    @if (Model.Products != null && Model.Products.Any())
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in Model.Products)
+                {
+                    <tr>
+                        <td>@product.Id</td>
+                        <td>@product.Name</td>
+                        <td>$@product.Price.ToString("F2")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <p>No products available or unable to connect to API.</p>
+            <p><small>API URL: @Model.ApiBaseUrl</small></p>
+        </div>
+    }
+</div>

@@ -1,0 +1,39 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.tfvars
+!terraform.tfvars.example
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application
+bin/
+obj/
+*.user
+*.suo
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+
+# Docker
+.dockerignore
+
+# Logs
+*.log
+logs/

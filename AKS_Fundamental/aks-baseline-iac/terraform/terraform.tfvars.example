@@ -1,0 +1,32 @@
+# Copy this file to terraform.tfvars and update with your values
+
+project_name = "aks-baseline"
+environment  = "dev"
+location     = "eastus"
+
+kubernetes_version = "1.28"
+
+# Node pool configuration
+aks_system_node_count = 3
+aks_user_node_count   = 3
+aks_system_vm_size    = "Standard_D2s_v3"
+aks_user_vm_size      = "Standard_D4s_v3"
+
+# Network configuration
+vnet_address_space          = ["10.0.0.0/16"]
+aks_subnet_address_prefix   = "10.0.1.0/24"
+appgw_subnet_address_prefix = "10.0.2.0/24"
+
+# SQL Database credentials
+sql_admin_username = "sqladmin"
+sql_admin_password = "YourSecurePassword123!" # Change this!
+
+# Private cluster (set to true for production)
+enable_private_cluster = false
+
+# Tags
+tags = {
+  ManagedBy   = "Terraform"
+  Project     = "AKS-Baseline"
+  Environment = "Development"
+}
