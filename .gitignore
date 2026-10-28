@@ -97,10 +97,7 @@ terraform.rc
 
 .infracost/*
 **/.infracost/*
-**/k8s-Copy/*
-*.ps1
 *.config
 AKS_agent/VBD_Agentic_AKS_Operations.md
 MicroservicesLab/
-AKS_KAITO/vbdexample.md
 .envrc
