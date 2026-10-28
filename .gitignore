@@ -45,17 +45,20 @@ desktop.ini
 *.bak
 *.backup
 
-# Azure Resource Manager parameter files with secrets
-*parameters.json
-azuredeploy.parameters.json
+# Commit sanitized parameter templates; keep credentials in local/secret overrides.
+*parameters.local.json
+*parameters.secret.json
 
-# Kubernetes config
-AIandML/iac/modules/aks/azurek8s.config
+# Generated AKS kubeconfigs (contain cluster credentials)
+**/modules/aks/azurek8s.config
+/AKS_KAITO/RAG/kaito-aks-cluster*.config
 
 # kubeconfig files
+.kube/
 kubeconfig
 *.kubeconfig
-config.yaml
+# Use config.local.yaml for credential-bearing local configuration.
+config.local.yaml
 
 # SSH keys
 id_rsa
@@ -93,11 +96,9 @@ terraform.rc
 *.client_certificate
 #ignore kubernetes.crt files
 *.crt
-/modules/aks/azurek8s.config
 
 .infracost/*
 **/.infracost/*
-*.config
 
 MicroservicesLab/
 .envrc
