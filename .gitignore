@@ -22,10 +22,10 @@ pull-secret.txt
 *.tfstate
 *.tfstate.*
 .terraform/
-.terraform.lock.hcl
+#.terraform.lock.hcl
 
 # IDE
-.vscode/
+#.vscode/
 .idea/
 *.swp
 *.swo
@@ -78,7 +78,7 @@ worker_vnet_name.txt
 terraform.rc
 
 #ignote terraform lock file 
-.terraform.lock.hcl
+#.terraform.lock.hcl
 # ignote terraform tfplan files
 *.tfplan
 #ignore kubeconfig files
@@ -98,6 +98,6 @@ terraform.rc
 .infracost/*
 **/.infracost/*
 *.config
-AKS_agent/VBD_Agentic_AKS_Operations.md
+
 MicroservicesLab/
 .envrc
