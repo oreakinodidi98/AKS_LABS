@@ -1,0 +1,6 @@
+{
+  "skillDirectories": ["../.github/skills"],
+  "agentDirectories": ["../.github/agents"],
+  "instructionDirectories": ["../.github/instructions"],
+  "hookDirectories": ["../.github/hooks"]
+}
