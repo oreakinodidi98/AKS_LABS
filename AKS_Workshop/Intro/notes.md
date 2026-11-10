@@ -1,42 +1,84 @@
 # Kubernetes Architecture
 
-## Highlevel architecture
+These notes cover how Kubernetes runs containers across a cluster and how users reach
+an application.
 
-objective: run/orchestrate containers
-container types like docker, creo, containerd
-how: by running insinde VM or physical servers
-cluster = multiple vms or physical servers (nodes)
-in each node we want to run a container
-to run a container we need container runtime to run in the node
-e.g. docker containers = containerd runtime
-allows you o run a container on the node
+## Context
 
-pain point: dont want to access nodes directly in order to run contianer
+| Concept | Description |
+| --- | --- |
+| Objective | Run and orchestrate containers. |
+| Cluster | A group of virtual machines or physical servers, called nodes. |
+| Node | A machine in the cluster where application containers run. |
+| Desired state | A declarative configuration, often provided in a YAML file, that describes what should run. |
+| Container runtime | Software on a node that runs containers, such as containerd or CRI-O. |
 
-control plane : runs and orchestrates deployment of containers ont he node
-- brain of kubernetes
-- controlls which container runs on different worker nodes
-- inside control plane you have :
- - API server: Gets request
- - ETCD: key value pair that stores configuration for cluster
- - Scheduler: schedules pods on nodes
- - Controller manger: helps deploy continers on to different nodes
- - cloud manager: provisions managed resources from cloud provider
+## How a deployment works
 
-- Inside Worker nodes
- - Kubelet: gets request from control plane to start command inside node
- - container runtime: what you need to run container
+Developers use `kubectl`, the Kubernetes command-line tool, to send requests to the
+control plane. Kubernetes then works to make the cluster match the desired state.
 
-Developer -> kubectl -> Control plane -> worker nodes
-- kubectl = cli to induce request to control plane
-- can include yaml file
-- kubernetes uses desired state configuration (declaritive)
+```text
+Developer
+    │
+    ▼
+kubectl (CLI; can submit YAML configuration)
+    │
+    ▼
+Control plane
+    │ schedules and manages application pods
+    ▼
+Worker nodes
+    │
+    ▼
+Container runtime → Containers
+```
 
-for users to access the app they have to go through load alancers, as multiple instancce of application in container inside node inside cluster
+The control plane is the brain of Kubernetes. It manages deployments and coordinates
+which containers run on which worker nodes, so developers do not need to access nodes
+directly to run containers.
 
-role of node balancer is tot distribute traffic/request to the different containers 
-this resource can be provisioned by the cloud that hosts the cluster
-E.G. Azure (AKS), GCP (GKE), Amazon (EKS)
-kubernetes managed service
+## Control plane components
 
-managed isk -> database or want to store files
+| Component | Role |
+| --- | --- |
+| API server | Receives requests to the Kubernetes API. |
+| etcd | Stores the cluster's configuration and state as key-value data. |
+| Scheduler | Chooses nodes for pods to run on. |
+| Controller manager | Helps keep the cluster in the desired state, including by managing deployments. |
+| Cloud controller manager | Provisions and manages resources from the cloud provider. |
+
+## Worker node components
+
+| Component | Role |
+| --- | --- |
+| Kubelet | Receives instructions from the control plane and makes sure containers are running on the node. |
+| Container runtime | Runs containers on the node. Kubernetes uses containerd or CRI-O; Docker images can run here. |
+
+## How users reach an application
+
+An application may have multiple instances running in containers across nodes. A load
+balancer distributes incoming requests to those instances. The cloud provider can
+provision this resource for the cluster.
+
+```text
+Users
+  │ requests
+  ▼
+Load balancer
+  │ distributes traffic
+  ▼
+Application instances in containers
+  │ run on
+  ▼
+Worker nodes in the cluster
+```
+
+| Cloud provider | Managed Kubernetes service |
+| --- | --- |
+| Azure | AKS |
+| Google Cloud | GKE |
+| Amazon Web Services | EKS |
+
+Cloud providers can also offer managed resources, such as disks for persistent
+application data, including database or file data.
