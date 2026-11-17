@@ -1,0 +1,8 @@
+@model Product
+<article class="product-card">
+    <a class="product-image" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ID"><img src="@Model.Image" alt="@Model.Name" loading="lazy" /></a>
+    <div class="product-meta"><span class="eyebrow">@Model.Category</span><span>@Model.Price.ToString("C")</span></div>
+    <h3><a asp-controller="Products" asp-action="Details" asp-route-id="@Model.ID">@Model.Name</a></h3>
+    <p>@Model.Description</p>
+    <form asp-controller="Cart" asp-action="Add" asp-route-id="@Model.ID" method="post"><button class="button secondary" type="submit"><i data-lucide="plus" aria-hidden="true"></i> Add to basket</button></form>
+</article>

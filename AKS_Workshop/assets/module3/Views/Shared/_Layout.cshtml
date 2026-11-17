@@ -1,0 +1,49 @@
+@inject CaldovaBakery.Services.CartService Cart
+@{
+    var basket = await Cart.GetAsync();
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var action = ViewContext.RouteData.Values["action"]?.ToString();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#762d41" />
+    <title>@ViewData["Title"] | Caldova Bakery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="announcement">Small batches. Slow mornings. Something lovely, every day.</div>
+    <header class="site-header">
+        <a class="brand" asp-controller="Home" asp-action="Index">Caldova<span>BAKERY &amp; EVERYDAY JOYS</span></a>
+        <nav aria-label="Main navigation">
+            <a class="@(controller == "Home" && action == "Index" ? "active" : "")" asp-controller="Home" asp-action="Index">Home</a>
+            <a class="@(controller == "Products" ? "active" : "")" asp-controller="Products" asp-action="Index">Our bakes</a>
+            <a class="@(action == "About" ? "active" : "")" asp-controller="Home" asp-action="About">Our story</a>
+            <a class="@(action == "Store" ? "active" : "")" asp-controller="Home" asp-action="Store">Find us</a>
+            <a class="@(action == "Contact" ? "active" : "")" asp-controller="Home" asp-action="Contact">Contact</a>
+        </nav>
+        <a class="basket-link" asp-controller="Cart" asp-action="Index"><i data-lucide="shopping-bag" aria-hidden="true"></i> Basket <span class="count">@basket.Count</span></a>
+    </header>
+    @if (TempData["Success"] != null)
+    {
+        <div class="notice success" role="status">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="notice error" role="alert">@TempData["Error"]</div>
+    }
+    <main id="main">@RenderBody()</main>
+    <footer>
+        <div class="footer-main"><div><a class="brand" asp-controller="Home" asp-action="Index">Caldova</a><p>A little flour. A lot of heart.</p></div><div><h2>Come on over</h2><p>85 Pike Street, Seattle, WA<br />Sample location for this workshop</p></div><div><h2>Good to know</h2><a asp-controller="Orders" asp-action="Summary">Last order</a><a asp-controller="Admin" asp-action="Index">Manage products</a></div></div>
+        <div class="footer-bottom"><span>&copy; @DateTime.UtcNow.Year Caldova Bakery</span><span>Workshop demo. No payments or real orders.</span></div>
+    </footer>
+    <script src="~/js/lucide.min.js" asp-append-version="true"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+</body>
+</html>

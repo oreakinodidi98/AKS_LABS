@@ -1,0 +1,7 @@
+@model Product
+<div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+<input type="hidden" asp-for="ID" />
+<div class="field"><label asp-for="Name"></label><input asp-for="Name" maxlength="100" required /><span asp-validation-for="Name"></span></div>
+<div class="field-row"><div class="field"><label asp-for="Price">Price (USD)</label><input asp-for="Price" type="number" min="0.01" max="9999.99" step="0.01" required /><span asp-validation-for="Price"></span></div><div class="field"><label asp-for="Category"></label><input asp-for="Category" maxlength="50" list="categories" required /><datalist id="categories"><option>Pastries</option><option>Bread</option><option>Cakes</option><option>Cookies</option></datalist><span asp-validation-for="Category"></span></div></div>
+<div class="field"><label asp-for="Image">Image path or HTTPS URL</label><input asp-for="Image" maxlength="500" required /><small class="muted">For example: /images/croissant.jpg</small><span asp-validation-for="Image"></span></div>
+<div class="field"><label asp-for="Description"></label><textarea asp-for="Description" rows="4" maxlength="2000" required></textarea><span asp-validation-for="Description"></span></div>

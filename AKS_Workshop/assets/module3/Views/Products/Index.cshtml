@@ -1,0 +1,9 @@
+@model CatalogViewModel
+@{ ViewData["Title"] = "Our bakes"; }
+<section class="page-heading"><span class="eyebrow">SOMETHING FOR YOUR EVERYDAY</span><h1>Our bakes.</h1><p>From the first buttery bite to the last crumb.</p></section>
+<section class="section catalog">
+    <form method="get" class="filters" role="search"><div><label for="search">Find a favorite</label><input id="search" name="search" type="search" value="@Model.Search" placeholder="Search our bakes" maxlength="100" /></div><div><label for="category">Category</label><select id="category" name="category"><option value="">All bakes</option>@foreach (var category in Model.Categories) { <option value="@category" selected="@(category == Model.Category)">@category</option> }</select></div><button class="button" type="submit"><i data-lucide="search" aria-hidden="true"></i> Search</button><a class="text-link" asp-action="Index">Reset</a></form>
+    <p class="muted">@Model.Products.Count @(Model.Products.Count == 1 ? "bake" : "bakes") to brighten your day</p>
+    @if (Model.Products.Count == 0) { <div class="empty-state"><h2>No bakes found.</h2><p>Try a different search or browse the full menu.</p><a class="button" asp-action="Index">Browse all bakes</a></div> }
+    <div class="product-grid">@foreach (var product in Model.Products) { <partial name="_ProductCard" model="product" /> }</div>
+</section>

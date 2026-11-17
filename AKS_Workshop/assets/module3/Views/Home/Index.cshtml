@@ -1,0 +1,15 @@
+@model System.Collections.Generic.List<Product>
+@{ ViewData["Title"] = "Freshly baked, every day"; }
+<section class="hero">
+    <img class="hero-photo" src="~/images/hero.jpg" alt="Freshly baked croissants with crisp golden layers" fetchpriority="high" />
+    <div class="hero-shade"></div>
+    <div class="hero-copy"><span class="eyebrow">YOUR NEIGHBORHOOD BAKERY</span><h1>Caldova Bakery</h1><p>For the love of<br />a good morning.</p><div class="hero-description">Slow-fermented loaves, buttery layers, and sweet little reasons to pause.</div><a class="button light" asp-controller="Products" asp-action="Index">Explore our bakes <i data-lucide="arrow-right" aria-hidden="true"></i></a></div>
+    <span class="hero-caption">BAKED FRESH. SHARED WITH LOVE.</span>
+</section>
+<div class="values-strip"><span><i data-lucide="wheat" aria-hidden="true"></i> Made from scratch</span><span><i data-lucide="heart" aria-hidden="true"></i> Baked in small batches</span><span><i data-lucide="store" aria-hidden="true"></i> Ready for local pickup</span></div>
+<section class="section">
+    <div class="section-heading"><div><span class="eyebrow">FRESH FROM THE OVEN</span><h2>The usual favorites.</h2></div><a class="text-link" asp-controller="Products" asp-action="Index">See all bakes <i data-lucide="arrow-right" aria-hidden="true"></i></a></div>
+    @if (Model.Count == 0) { <p>Something delicious is on its way. Check back soon.</p> }
+    <div class="product-grid">@foreach (var product in Model) { <partial name="_ProductCard" model="product" /> }</div>
+</section>
+<section class="story-band"><img src="~/images/sourdough.jpg" alt="Rustic sourdough bread" loading="lazy" /><div><span class="eyebrow">A LITTLE FLOUR. A LOT OF HEART.</span><h2>Good things<br />take their time.</h2><p>We believe the best days begin with something handmade. That's why we let our dough rest, choose our ingredients with care, and make every batch a little personal.</p><a class="text-link" asp-action="About">Meet Caldova <i data-lucide="arrow-right" aria-hidden="true"></i></a></div></section>

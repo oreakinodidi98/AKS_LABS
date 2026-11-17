@@ -1,0 +1,37 @@
+services:
+  bakery:
+    build:
+      context: .
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:${BAKERY_PORT:-5080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__BakeryDatabase: "Server=sql,1433;Database=CaldovaBakery;User Id=sa;Password=${BAKERY_SQL_PASSWORD:?Set BAKERY_SQL_PASSWORD};Encrypt=True;TrustServerCertificate=True"
+    depends_on:
+      sql:
+        condition: service_healthy
+    volumes:
+      - bakery-keys:/home/bakery/.aspnet/DataProtection-Keys
+    restart: "no"
+
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "${BAKERY_SQL_PASSWORD:?Set BAKERY_SQL_PASSWORD}"
+    volumes:
+      - bakery-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: "no"
+
+volumes:
+  bakery-data:
+  bakery-keys:

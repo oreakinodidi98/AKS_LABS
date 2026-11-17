@@ -1,0 +1,13 @@
+@model CartViewModel
+@{ ViewData["Title"] = "Your basket"; }
+<section class="page-heading"><span class="eyebrow">GOOD THINGS AWAIT</span><h1>Your basket.</h1></section>
+<section class="section">
+@if (Model.Lines.Count == 0)
+{
+    <div class="empty-state"><i data-lucide="shopping-bag" aria-hidden="true"></i><h2>A little room for something lovely.</h2><p>Your basket is empty. Let's find your next favorite.</p><a class="button" asp-controller="Products" asp-action="Index">Explore our bakes <i data-lucide="arrow-right" aria-hidden="true"></i></a></div>
+}
+else
+{
+    <div class="checkout-layout"><div>@foreach (var line in Model.Lines) { <article class="cart-line"><img src="@line.Product.Image" alt="@line.Product.Name" /><div><h2><a asp-controller="Products" asp-action="Details" asp-route-id="@line.Product.ID">@line.Product.Name</a></h2><p class="muted">@line.Product.Price.ToString("C") each</p><div class="cart-controls"><form asp-action="Update" asp-route-id="@line.Product.ID" method="post"><label class="sr-only" for="quantity-@line.Product.ID">Quantity for @line.Product.Name</label><input id="quantity-@line.Product.ID" name="quantity" type="number" value="@line.Quantity" min="0" max="99" required /><button class="icon-button" type="submit" title="Update quantity" aria-label="Update quantity for @line.Product.Name"><i data-lucide="refresh-cw" aria-hidden="true"></i></button></form><form asp-action="Remove" asp-route-id="@line.Product.ID" method="post"><button class="icon-button danger" type="submit" title="Remove product" aria-label="Remove @line.Product.Name"><i data-lucide="trash-2" aria-hidden="true"></i></button></form></div></div><strong>@line.Total.ToString("C")</strong></article> }<a class="text-link" asp-controller="Products" asp-action="Index"><i data-lucide="arrow-left" aria-hidden="true"></i> Keep browsing</a></div><aside class="order-totals"><h2>The good stuff</h2><div class="total-row"><span>@Model.Count items</span><span>@Model.Total.ToString("C")</span></div><div class="total-row"><span>Pickup</span><span>Free</span></div><div class="total-row grand-total"><span>Total (USD)</span><strong>@Model.Total.ToString("C")</strong></div><a class="button full-width" asp-controller="Orders" asp-action="Checkout">Checkout <i data-lucide="arrow-right" aria-hidden="true"></i></a><p class="muted">Demo pickup order. No tax, delivery, or payment processing.</p><p class="muted">Prices are refreshed from the menu at checkout.</p></aside></div>
+}
+</section>

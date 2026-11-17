@@ -1,0 +1,3 @@
+@model Product
+@{ ViewData["Title"] = "Delete product"; }
+<section class="section form-page"><span class="eyebrow">BAKERY ADMIN</span><h1>Delete this bake?</h1><img class="delete-preview" src="@Model.Image" alt="@Model.Name" /><h2>@Model.Name</h2><p>@Model.Price.ToString("C")</p><p>This removes the product from the store and any active baskets. Previously placed orders will keep their original product details.</p><form asp-action="Delete" asp-route-id="@Model.ID" method="post"><div class="actions"><button class="button destructive" type="submit"><i data-lucide="trash-2" aria-hidden="true"></i> Delete product</button><a class="text-link" asp-action="Index">Keep product</a></div></form></section>
