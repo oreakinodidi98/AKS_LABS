@@ -1,10 +1,10 @@
 # Caldova Bakery
 
-A deliberately legacy **ASP.NET Core 3.0 MVC** workshop application backed by
-**SQL Server** and **Entity Framework Core 3.0.3**. No authentication is included.
+An **ASP.NET Core 8.0 MVC** workshop application backed by **SQL Server** and
+**Entity Framework Core 8.0.34**. No authentication is included.
 
-> ASP.NET Core 3.0, EF Core 3.0 and the container operating system are out of
-> support. This application is for isolated, local modernization demos only.
+> .NET 8 reached [end of support](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)
+> on November 10, 2026. This application is for isolated, local workshop demos only.
 > Do not expose it publicly, enter real customer information, or use it for a
 > real business. Anyone who can reach the app can change or delete products.
 
@@ -23,7 +23,10 @@ Checkout records a **demo pickup order only**. It does not collect payments,
 calculate tax, send email, reserve stock, schedule pickup or arrange delivery.
 The contact address and store location are illustrative.
 
-## Run With Docker (Recommended)
+For Module 3, [run without Docker](#run-without-docker). Containerization is
+covered in the next module.
+
+## Run With Docker (Next Module)
 
 Prerequisites: Docker Desktop running **Linux containers**, Docker Compose v2,
 an internet connection for the initial image pulls, and at least 4 GB of free
@@ -62,19 +65,25 @@ Changing the password environment variable does not change the SA password in
 an existing database volume: retain the original value or intentionally reset
 the disposable data volume.
 
-The archived .NET 3.0 images may not be available in every environment. The
-Dockerfile uses historical `dotnet/core` image repositories intentionally.
-Do not silently substitute a modern runtime if the purpose is a legacy demo.
+The Dockerfile uses the .NET 8 SDK and ASP.NET Core 8 runtime images, with a
+non-root runtime user and HTTP listening on port 8080 inside the container.
 
 ## Run Without Docker
 
-Install the archived .NET Core 3.0 SDK (3.0.103), or a newer SDK capable of
-compiling `netcoreapp3.0`, **and the ASP.NET Core 3.0 runtime**. Installing only
-a modern SDK/runtime is not enough to run this app. Provide a running SQL Server
-instance and a login allowed to create the demo database and tables.
-ASP.NET Core 3.0 has no native Windows ARM64 runtime. On Windows ARM, use the
-Linux x86-64 container route with working emulation or a separate x86-64 host;
-the installed ARM64 .NET 10 runtime cannot run this application.
+Install the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), which
+includes the ASP.NET Core 8 runtime. Choose the installer matching your machine:
+**Arm64** on Windows ARM or **x64** on Intel/AMD Windows. A newer SDK can build
+`net8.0`, but you still need **Microsoft.AspNetCore.App 8.0.x** and
+**Microsoft.NETCore.App 8.0.x** to run it; .NET 10 runtimes alone are insufficient.
+
+Provide a running SQL Server 2016 or newer instance and a login allowed to create
+the demo database and tables. Database compatibility level must be **130 or
+higher** because EF Core 8 uses `OPENJSON` for the basket's product-ID query.
+See [EF Core 8 SQL Server compatibility](https://learn.microsoft.com/ef/core/what-is-new/ef-core-8.0/breaking-changes#contains-in-linq-queries-may-stop-working-on-older-sql-server-versions).
+On x64 Windows, SQL Server 2022 Express LocalDB is an option; follow the
+[Module 3 guide](../../03.AppSetUp.md#configure-the-database). LocalDB is not
+available natively on Windows ARM64. Run the app natively on ARM64 and connect
+to SQL Server on another supported machine instead.
 
 Set `ConnectionStrings__BakeryDatabase` privately in your terminal, using this
 connection-string shape with your own values:
@@ -87,6 +96,7 @@ Server=YOUR_SQL_HOST;Database=CaldovaBakery;User Id=YOUR_USER;Password=YOUR_PASS
 certificate only. Configure a trusted certificate for any real environment.
 
 ```powershell
+dotnet --list-runtimes
 dotnet restore
 dotnet build --no-restore
 dotnet run --urls http://localhost:5080
@@ -134,8 +144,10 @@ delete receipts. Missing products are removed from baskets on the next read.
 The current SQL price is used when checkout is submitted.
 
 Schema initialization uses `EnsureCreated`, not migrations. It is suitable for
-a fresh demo database only. Schema changes require an intentional database reset
-or a separately designed migration strategy; do not point at an existing app DB.
+a fresh demo database only. The .NET 8 upgrade does not intentionally change the
+bakery schema or require a data reset; back up any existing demo database before
+testing the upgrade. Schema changes require an intentional database reset or a
+separately designed migration strategy; do not point at an unrelated app DB.
 If all products are deleted, a restart seeds the sample products again.
 
 The in-memory session cart expires after 60 idle minutes and is lost on app

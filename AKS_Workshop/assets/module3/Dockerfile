@@ -1,11 +1,11 @@
-FROM mcr.microsoft.com/dotnet/core/sdk:3.0.103-buster AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY CaldovaBakery.csproj ./
 RUN dotnet restore CaldovaBakery.csproj
 COPY . .
 RUN dotnet publish CaldovaBakery.csproj -c Release -o /app/publish --no-restore
 
-FROM mcr.microsoft.com/dotnet/core/aspnet:3.0.3-buster-slim AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 LABEL com.azure.containerizationassist.createdby="containerization-assist"
 RUN useradd --create-home --uid 10001 bakery
