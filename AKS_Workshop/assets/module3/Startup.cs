@@ -20,10 +20,23 @@ namespace CaldovaBakery
 
         public void ConfigureServices(IServiceCollection services)
         {
-            var connection = configuration.GetConnectionString("BakeryDatabase");
-            if (string.IsNullOrWhiteSpace(connection))
-                throw new InvalidOperationException("Set ConnectionStrings__BakeryDatabase to a SQL Server connection string. See README.md.");
-            services.AddDbContext<BakeryContext>(options => options.UseSqlServer(connection, sql => sql.EnableRetryOnFailure()));
+            var provider = configuration["DatabaseProvider"] ?? "Sqlite";
+            if (string.Equals(provider, "Sqlite", StringComparison.OrdinalIgnoreCase))
+            {
+                var connection = configuration.GetConnectionString("SqliteDatabase") ?? "Data Source=caldova-bakery.db";
+                services.AddDbContext<BakeryContext>(options => options.UseSqlite(connection));
+            }
+            else if (string.Equals(provider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+            {
+                var connection = configuration.GetConnectionString("BakeryDatabase");
+                if (string.IsNullOrWhiteSpace(connection))
+                    throw new InvalidOperationException("Set ConnectionStrings__BakeryDatabase to a SQL Server connection string. See README.md.");
+                services.AddDbContext<BakeryContext>(options => options.UseSqlServer(connection, sql => sql.EnableRetryOnFailure()));
+            }
+            else
+            {
+                throw new InvalidOperationException("DatabaseProvider must be Sqlite or SqlServer. See README.md.");
+            }
             services.AddDistributedMemoryCache();
             services.AddSession(options =>
             {

@@ -7,3 +7,7 @@
 .env.*
 *.user
 tests/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.db-journal

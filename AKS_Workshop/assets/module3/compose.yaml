@@ -7,6 +7,7 @@ services:
       - "127.0.0.1:${BAKERY_PORT:-5080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      DatabaseProvider: SqlServer
       ConnectionStrings__BakeryDatabase: "Server=sql,1433;Database=CaldovaBakery;User Id=sa;Password=${BAKERY_SQL_PASSWORD:?Set BAKERY_SQL_PASSWORD};Encrypt=True;TrustServerCertificate=True"
     depends_on:
       sql:

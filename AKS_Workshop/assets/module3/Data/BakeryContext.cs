@@ -13,8 +13,11 @@ namespace CaldovaBakery.Data
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
-            builder.Entity<Product>().Property(product => product.Price).HasColumnType("decimal(10,2)");
-            builder.Entity<OrderItem>().Property(item => item.UnitPrice).HasColumnType("decimal(10,2)");
+            if (Database.IsSqlServer())
+            {
+                builder.Entity<Product>().Property(product => product.Price).HasColumnType("decimal(10,2)");
+                builder.Entity<OrderItem>().Property(item => item.UnitPrice).HasColumnType("decimal(10,2)");
+            }
             builder.Entity<Order>().HasMany(order => order.Items).WithOne().HasForeignKey(item => item.OrderID);
         }
     }

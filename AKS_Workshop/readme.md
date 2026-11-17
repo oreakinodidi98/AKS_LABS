@@ -5,7 +5,9 @@
 - [Module 3: Caldova Bakery application](03.AppSetUp.md)
 
 Module 3 contains an ASP.NET Core 8.0 MVC bakery store with
-SQL Server, product administration, a cart and demo checkout. Start with the
+SQLite by default, product administration, a cart and demo checkout. No separate
+database installation is required. SQL Server remains available for Docker/AKS.
+Start with the
 [local setup guide](03.AppSetUp.md). Docker setup is covered in the next module;
 the [application README](assets/module3/README.md) includes both options.
 

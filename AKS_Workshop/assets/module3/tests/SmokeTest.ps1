@@ -83,7 +83,7 @@ try {
     $malformedQuantity = Submit-Form "/Cart/Add/$productID" @{ quantity = 'abc' } '/Products'
     Assert-True ($malformedQuantity.StatusCode -eq 400) 'Non-numeric quantity is rejected'
     $basket = Submit-Form "/Cart/Add/$productID" @{ quantity = '2' } '/Products'
-    Assert-True ($basket.StatusCode -eq 200 -and $basket.Content.Contains('$17.00')) 'Basket calculates two products at the SQL price'
+    Assert-True ($basket.StatusCode -eq 200 -and $basket.Content.Contains('$17.00')) 'Basket calculates two products at the stored price'
     $updated = Submit-Form "/Cart/Update/$productID" @{ quantity = '3' } '/Cart'
     Assert-True ($updated.Content.Contains('$25.50')) 'Quantity updates recalculate the basket total'
     $removed = Submit-Form "/Cart/Remove/$productID" @{} '/Cart'
@@ -112,7 +112,7 @@ try {
     $summary = Request '/Orders/Summary'
     Assert-True ($summary.Content.Contains($productName) -and $summary.Content.Contains('$17.00')) 'Product deletion preserves the order snapshot'
     $productID = $null
-    Write-Output 'All Caldova Bakery smoke checks passed. One fictional order remains in SQL Server.'
+    Write-Output 'All Caldova Bakery smoke checks passed. One fictional order remains in the database.'
 }
 finally {
     if ($null -ne $productID) {
