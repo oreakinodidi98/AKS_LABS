@@ -1,7 +1,8 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY CaldovaBakery.csproj ./
-RUN dotnet restore CaldovaBakery.csproj
+ARG NUGET_SOURCE=https://api.nuget.org/v3/index.json
+RUN dotnet restore CaldovaBakery.csproj --source "$NUGET_SOURCE"
 COPY . .
 RUN dotnet publish CaldovaBakery.csproj -c Release -o /app/publish --no-restore
 

@@ -70,6 +70,20 @@ the disposable data volume.
 
 The Dockerfile uses the .NET 8 SDK and ASP.NET Core 8 runtime images, with a
 non-root runtime user and HTTP listening on port 8080 inside the container.
+Its SDK stage runs on the builder's native CPU, even when targeting an x64
+runtime image from ARM64. NuGet.org is the default package feed. If Docker
+restore fails with `NU1301`, see the
+[Module 4 troubleshooting steps](../../04.Dockerfile.md#if-package-restore-fails-with-nu1301)
+to supply an approved mirror with the `NUGET_SOURCE` build argument. For Compose,
+build first with that argument, then start without rebuilding:
+
+```powershell
+docker compose build --build-arg NUGET_SOURCE=https://packagefeedproxy.microsoft.io/nuget/v3/index.json
+docker compose up --no-build -d --wait --wait-timeout 240
+```
+
+The example mirror is specific to this lab environment. Use your organization's
+approved feed elsewhere. Build arguments must not contain credentials.
 
 ## Run Without Docker
 
