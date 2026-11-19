@@ -8,11 +8,11 @@ $env:RAND = $RAND
 Write-Output "Random resource identifier will be: $RAND"
 
 # Set Location
-$env:AZR_RESOURCE_LOCATION = "uksouth"
+$env:AZR_RESOURCE_LOCATION = "swedencentral"
 Write-Output "Location set to: $env:AZR_RESOURCE_LOCATION"
 
 # login to az cli
-az login
+#az login
 
 # check quota for ARO clusters
 az vm list-usage --location $env:AZR_RESOURCE_LOCATION -o table
@@ -34,13 +34,14 @@ $env:AZR_RESOURCE_GROUP = "rg-openshift$RAND"
 Write-Output "Resource group name: $env:AZR_RESOURCE_GROUP"
 $env:AZR_CLUSTER= "cluster$RAND"
 Write-Output "Cluster name: $env:AZR_CLUSTER"
-$env:AZR_PULL_SECRET=~/Downloads/pull-secret.txt
+$env:AZR_PULL_SECRET='./pull-secret.txt'
 Write-Output "Pull secret file path: $env:AZR_PULL_SECRET"
 
 # Create a resource group
 az group create `
   --name $env:AZR_RESOURCE_GROUP `
-  --location $env:AZR_RESOURCE_LOCATION
+  --location $env:AZR_RESOURCE_LOCATION `
+  --tags SecurityControl=Ignore
 Write-Output "Resource group $env:AZR_RESOURCE_GROUP created"
 
 # create Networking
@@ -79,7 +80,12 @@ az aro create `
   --vnet "$env:AZR_CLUSTER-aro-vnet-$env:AZR_RESOURCE_LOCATION" `
   --master-subnet "$env:AZR_CLUSTER-aro-control-subnet-$env:AZR_RESOURCE_LOCATION" `
   --worker-subnet "$env:AZR_CLUSTER-aro-machine-subnet-$env:AZR_RESOURCE_LOCATION" `
-  --pull-secret @$env:AZR_PULL_SECRET
+  --pull-secret "@$($env:AZR_PULL_SECRET)" `
+  --master-vm-size Standard_D8s_v5 `
+  --worker-vm-size Standard_D4s_v5
+if ($LASTEXITCODE -ne 0) {
+  throw "az aro create failed with exit code $LASTEXITCODE."
+}
 Write-Output "Cluster $env:AZR_CLUSTER creation initiated. This may take around 30-40 minutes to complete."
 
 # get cluster credentials
