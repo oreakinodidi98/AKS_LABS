@@ -42,12 +42,12 @@ $env:NP_NAME="np-1"
 write-Output "Node pool name set to: $env:NP_NAME"
 
 # Versions 
-$env:API_VERSION="2025-12-23-preview" 
+$env:API_VERSION="2026-09-01-preview"
 $env:CLUSTER_VERSION="4.20"
 $env:NP_VERSION="4.20.21"
 
 # login to az cli
-az login
+#az login
 
 # register the ARO resource provider
 az provider register -n Microsoft.RedHatOpenShift --wait
@@ -59,7 +59,7 @@ az provider register -n Microsoft.Authorization --wait
 az provider show --namespace Microsoft.RedHatOpenShift --query "registrationState" -o tsv
 
 # validate HCP resource type availability in this subscription
-$hcpType = az provider show --namespace Microsoft.RedHatOpenShift --query "resourceTypes[?resourceType=='hcpOpenShiftClusters'].resourceType | [0]" -o tsv
+$hcpType = az provider show --namespace Microsoft.RedHatOpenShift --query "resourceTypes[?resourceType=='HCPOpenShiftClusters'].resourceType | [0]" -o tsv
 if ([string]::IsNullOrWhiteSpace($hcpType)) {
   Write-Error "This subscription does not expose Microsoft.RedHatOpenShift/hcpOpenShiftClusters. Available type is OpenShiftClusters only. Use an HCP-enabled subscription/region or switch to a classic ARO (OpenShiftClusters) template."
   exit 1
@@ -79,7 +79,7 @@ az group create `
 az deployment group create `
   --name "aro-hcp" `
   --resource-group $env:CUSTOMER_RG_NAME `
-  --template-file azuredeploy.bicep `
+  --template-file "C:\Users\oreakinodidi\AKS_LABS\ARO_HCP\azuredeploy.bicep" `
   --parameters customerNsgName="$env:CUSTOMER_NSG" `
   customerVnetName="$env:CUSTOMER_VNET_NAME" `
   customerVirtualNetworkIntegrationSubnetName="$env:CUSTOMER_VNET_INTEGRATION_SUBNET_NAME" `

@@ -36,6 +36,10 @@ $env:AZR_CLUSTER= "cluster$RAND"
 Write-Output "Cluster name: $env:AZR_CLUSTER"
 $env:AZR_PULL_SECRET='./pull-secret.txt'
 Write-Output "Pull secret file path: $env:AZR_PULL_SECRET"
+$env:MANAGED_RESOURCE_GROUP = "aro-$RAND-managed-rg"
+Write-Output "Managed resource group name: $env:MANAGED_RESOURCE_GROUP"
+$env:SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+write-Output "Subscription ID set to: $env:SUBSCRIPTION_ID"
 
 # Create a resource group
 az group create `
@@ -43,6 +47,11 @@ az group create `
   --location $env:AZR_RESOURCE_LOCATION `
   --tags SecurityControl=Ignore
 Write-Output "Resource group $env:AZR_RESOURCE_GROUP created"
+
+az group update \
+  --name $env:AZR_RESOURCE_GROUP \
+  --set tags.SecurityControl=Ignore
+Write-Output "Resource group $env:AZR_RESOURCE_GROUP updated with SecurityControl=Ignore"
 
 # create Networking
 az network vnet create `

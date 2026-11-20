@@ -8,8 +8,8 @@ $env:RAND = $RAND
 Write-Output "Random resource identifier will be: $RAND"
 
 # Set Location
-$env:LOCATION = "uksouth"
-# or eastus
+$env:LOCATION = "swedencentral"
+# or eastus swedencentral uksouth
 #$env:LOCATION = "eastus"
 Write-Output "Location set to: $env:LOCATION"
 
@@ -23,7 +23,7 @@ $env:CLUSTER_VERSION = "4.19.20"
 Write-Output "Cluster name: $env:CLUSTER_NAME"
 
 # Create the resource group
-az group create --name $env:RG_NAME --location $env:LOCATION
+az group create --name $env:RG_NAME --location $env:LOCATION --tags SecurityControl=Ignore
 
 # Register the Microsoft.RedHatOpenShift resource provider
 az provider register -n Microsoft.RedHatOpenShift --wait

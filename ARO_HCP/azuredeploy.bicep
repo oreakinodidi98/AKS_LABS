@@ -585,7 +585,7 @@ resource serviceManagedIdentityRoleAssignmentNSG 'Microsoft.Authorization/roleAs
 }
 
 // ARO HCP cluster
-resource hcp 'Microsoft.RedHatOpenShift/hcpOpenShiftClusters@2025-12-23-preview' = {
+resource hcp 'Microsoft.RedHatOpenShift/hcpOpenShiftClusters@2026-09-01-preview' = {
   name: clusterName
   location: resourceGroup().location
   properties: {
@@ -699,7 +699,7 @@ resource hcp 'Microsoft.RedHatOpenShift/hcpOpenShiftClusters@2025-12-23-preview'
 }
 
 // Default node pool
-resource nodepool 'Microsoft.RedHatOpenShift/hcpOpenShiftClusters/nodePools@2025-12-23-preview' = {
+resource nodepool 'Microsoft.RedHatOpenShift/hcpOpenShiftClusters/nodePools@2026-09-01-preview' = {
   parent: hcp
   name: nodePoolName
   location: resourceGroup().location
